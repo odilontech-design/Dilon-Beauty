@@ -80,6 +80,27 @@ export async function setBusinessHours(formData: FormData) {
   revalidatePath("/agendar");
 }
 
+export async function setSalonInfo(formData: FormData) {
+  const tenant = await requireTenant();
+
+  const whatsapp = String(formData.get("whatsapp") ?? "").trim();
+  const address = String(formData.get("address") ?? "").trim();
+
+  if (!whatsapp) throw new Error("WhatsApp é obrigatório.");
+  if (whatsapp.replace(/\D/g, "").length < 10) {
+    throw new Error("Informe um WhatsApp válido, com DDD (ex: 5521900000000).");
+  }
+  if (!address) throw new Error("Endereço é obrigatório.");
+
+  await prisma.salon.update({
+    where: { id: tenant.salonId },
+    data: { whatsapp, address },
+  });
+
+  revalidatePath("/configuracoes");
+  revalidatePath("/agendar");
+}
+
 export async function setLogo(formData: FormData) {
   const tenant = await requireTenant();
 

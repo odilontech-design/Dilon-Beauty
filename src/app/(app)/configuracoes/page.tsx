@@ -10,6 +10,7 @@ import {
   createService,
   setServiceActive,
   setBusinessHours,
+  setSalonInfo,
   setLogo,
 } from "@/app/actions/config";
 
@@ -79,14 +80,38 @@ export default async function ConfiguracoesPage() {
           {[
             ["Nome", salon.name],
             ["Plano", salon.plan],
-            ["WhatsApp", salon.whatsapp ?? "—"],
-            ["Endereço", salon.address ?? "—"],
           ].map(([l, v]) => (
             <div key={l} className="flex justify-between py-2 border-b border-gray-50 text-xs">
               <span className="text-gray-500">{l}</span>
               <span className="font-semibold text-navy">{v}</span>
             </div>
           ))}
+
+          <form action={setSalonInfo} className="space-y-2 mt-3">
+            <div>
+              <label className="block text-[10px] text-gray-400 mb-1">WhatsApp *</label>
+              <input
+                name="whatsapp"
+                required
+                defaultValue={salon.whatsapp ?? ""}
+                className="input"
+                placeholder="5521900000000"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] text-gray-400 mb-1">Endereço *</label>
+              <input
+                name="address"
+                required
+                defaultValue={salon.address ?? ""}
+                className="input"
+                placeholder="Rua, número, bairro, cidade"
+              />
+            </div>
+            <button type="submit" className="bg-navy text-white text-xs font-semibold rounded-lg py-2 px-3">
+              Salvar
+            </button>
+          </form>
 
           <div className="text-[11px] font-semibold text-gray-500 mt-4 mb-2">
             Horário de funcionamento (usado pra calcular os horários livres no link público)
