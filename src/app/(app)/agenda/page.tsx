@@ -1,138 +1,139 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/tenant";
 import { Card, StatusBadge } from "@/components/ui";
-import { createAppointment, updateAppointmentStatus } from "@/app/actions/agenda";
-import { formatDateBR } from "@/lib/date";
+import { updateAppointmentStatus } from "@/app/actions/agenda";
+import { todayUTCDate, startOfWeekUTC, addDaysUTC, dateToISO } from "@/lib/date";
 import { WhatsAppButton } from "@/components/WhatsAppButton";
+import { NewAppointmentModal } from "./NewAppointmentModal";
+import { RescheduleButton } from "./RescheduleButton";
 
-export default async function AgendaPage() {
+export default async function AgendaPage({
+  searchParams,
+}: {
+  searchParams: { date?: string };
+}) {
   const tenant = await requireTenant();
 
-  const [appointments, clients, professionals, services] = await Promise.all([
+  const requested = searchParams.date ? new Date(searchParams.date) : null;
+  const selectedDate = requested && !Number.isNaN(requested.getTime()) ? requested : todayUTCDate();
+  const selectedISO = dateToISO(selectedDate);
+
+  const weekStart = startOfWeekUTC(selectedDate);
+  const weekEnd = addDaysUTC(weekStart, 7);
+
+  const [weekAppointments, dayAppointments, clients, professionals, services] = await Promise.all([
     prisma.appointment.findMany({
-      where: { salonId: tenant.salonId },
+      where: { salonId: tenant.salonId, date: { gte: weekStart, lt: weekEnd } },
+      select: { date: true },
+    }),
+    prisma.appointment.findMany({
+      where: { salonId: tenant.salonId, date: selectedDate },
       include: { client: true, professional: true, service: true },
-      orderBy: [{ date: "desc" }, { time: "asc" }],
-      take: 30,
+      orderBy: { time: "asc" },
     }),
     prisma.client.findMany({ where: { salonId: tenant.salonId }, orderBy: { name: "asc" } }),
     prisma.professional.findMany({ where: { salonId: tenant.salonId, active: true } }),
     prisma.service.findMany({ where: { salonId: tenant.salonId, active: true } }),
   ]);
 
+  const countByDay: Record<string, number> = {};
+  weekAppointments.forEach((a) => {
+    const key = dateToISO(a.date);
+    countByDay[key] = (countByDay[key] ?? 0) + 1;
+  });
+
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDaysUTC(weekStart, i));
+  const dayTotal = dayAppointments
+    .filter((a) => a.status !== "CANCELADO")
+    .reduce((sum, a) => sum + a.price, 0);
+
   return (
     <div>
-      <h1 className="font-display font-extrabold text-xl text-navy mb-6">Agenda</h1>
+      <div className="flex items-start justify-between gap-4 mb-6">
+        <div>
+          <h1 className="font-display font-extrabold text-xl text-navy">Agenda</h1>
+          <p className="text-xs text-gray-500 mt-1">
+            {dayAppointments.length} agendamentos · {dayTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+          </p>
+        </div>
+        <NewAppointmentModal
+          defaultDate={selectedISO}
+          clients={clients.map((c) => ({ id: c.id, label: c.name }))}
+          professionals={professionals.map((p) => ({ id: p.id, label: p.name }))}
+          services={services.map((s) => ({ id: s.id, label: `${s.name} — R$ ${s.price.toFixed(2)}` }))}
+        />
+      </div>
 
-      <div className="grid grid-cols-[1fr_320px] gap-6">
-        <Card>
-          <div className="text-sm font-semibold text-navy mb-3">Próximos agendamentos</div>
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-left text-gray-400 border-b border-gray-100">
-                <th className="py-2 font-semibold">Data</th>
-                <th className="font-semibold">Hora</th>
-                <th className="font-semibold"></th>
-                <th className="font-semibold">Cliente</th>
-                <th className="font-semibold">Serviço</th>
-                <th className="font-semibold">Valor</th>
-                <th className="font-semibold">Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {appointments.map((a) => (
-                <tr key={a.id} className="border-b border-gray-50">
-                  <td className="py-2.5">{formatDateBR(a.date)}</td>
-                  <td className="font-bold text-navy">{a.time}</td>
-                  <td>
-                    <WhatsAppButton
-                      phone={a.client.phone}
-                      message={`Olá ${a.client.name}! Aqui é do ${tenant.salonName}.`}
-                    />
-                  </td>
-                  <td>{a.client.name}</td>
-                  <td className="text-gray-400">{a.service.name}</td>
-                  <td className="font-semibold text-navy">
-                    {a.price.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                  </td>
-                  <td><StatusBadge status={a.status} /></td>
-                  <td>
-                    {a.status !== "CONCLUIDO" && a.status !== "CANCELADO" && (
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+        {weekDays.map((d) => {
+          const iso = dateToISO(d);
+          const isSelected = iso === selectedISO;
+          const weekday = d.toLocaleDateString("pt-BR", { timeZone: "UTC", weekday: "short" }).replace(".", "");
+          const dayNum = d.toLocaleDateString("pt-BR", { timeZone: "UTC", day: "2-digit" });
+          return (
+            <Link
+              key={iso}
+              href={`/agenda?date=${iso}`}
+              className={`shrink-0 rounded-xl border px-3 py-2 text-center min-w-[76px] transition-colors ${
+                isSelected ? "text-white border-transparent" : "bg-white border-gray-200 text-navy hover:border-gray-300"
+              }`}
+              style={isSelected ? { background: "#00B8A0" } : undefined}
+            >
+              <div className="text-[10px] font-semibold uppercase opacity-80">{weekday}</div>
+              <div className="text-lg font-extrabold leading-tight">{dayNum}</div>
+              <div className="text-[9px] opacity-80">{countByDay[iso] ?? 0} agend.</div>
+            </Link>
+          );
+        })}
+      </div>
+
+      <Card>
+        {dayAppointments.length === 0 && (
+          <p className="text-xs text-gray-400 text-center py-6">Nenhum agendamento nesse dia.</p>
+        )}
+        <div className="divide-y divide-gray-50">
+          {dayAppointments.map((a) => {
+            const canChange = a.status !== "CONCLUIDO" && a.status !== "CANCELADO";
+            return (
+              <div key={a.id} className="flex items-center gap-4 py-3">
+                <div className="w-14 shrink-0">
+                  <div className="font-bold text-navy text-sm">{a.time}</div>
+                  <div className="text-[10px] text-gray-400">{a.service.durationMin}min</div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-navy text-sm">{a.client.name}</span>
+                    <StatusBadge status={a.status} />
+                  </div>
+                  <div className="text-xs text-gray-400 truncate">
+                    {a.service.name} · {a.professional.name}
+                  </div>
+                </div>
+                <div className="font-bold text-navy text-sm shrink-0">
+                  {a.price.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <WhatsAppButton
+                    phone={a.client.phone}
+                    message={`Olá ${a.client.name}! Aqui é do ${tenant.salonName}.`}
+                  />
+                  {canChange && (
+                    <>
+                      <RescheduleButton appointmentId={a.id} currentDate={selectedISO} currentTime={a.time} />
                       <form action={updateAppointmentStatus.bind(null, a.id, "CONCLUIDO")}>
                         <button className="text-[10px] font-semibold text-teal-700 hover:underline">
                           Marcar concluído
                         </button>
                       </form>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {appointments.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="py-6 text-center text-gray-400">
-                    Nenhum agendamento ainda. Cadastre o primeiro ao lado.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </Card>
-
-        <Card>
-          <div className="text-sm font-semibold text-navy mb-3">Novo agendamento</div>
-          <form action={createAppointment} className="space-y-3">
-            <Field label="Cliente">
-              <select name="clientId" required className="input">
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Profissional">
-              <select name="professionalId" required className="input">
-                {professionals.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Serviço">
-              <select name="serviceId" required className="input">
-                {services.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name} — R$ {s.price.toFixed(2)}</option>
-                ))}
-              </select>
-            </Field>
-            <div className="grid grid-cols-2 gap-2">
-              <Field label="Data">
-                <input type="date" name="date" required className="input" />
-              </Field>
-              <Field label="Hora">
-                <input type="time" name="time" required className="input" />
-              </Field>
-            </div>
-            <button type="submit" className="w-full bg-navy text-white text-xs font-semibold rounded-lg py-2.5 mt-2">
-              Agendar
-            </button>
-            {(clients.length === 0 || professionals.length === 0 || services.length === 0) && (
-              <p className="text-[10px] text-blush" style={{ color: "#C0526E" }}>
-                Cadastre ao menos 1 cliente, profissional e serviço para poder agendar.
-              </p>
-            )}
-          </form>
-        </Card>
-      </div>
-
-      <style>{`.input{ width:100%; border:1px solid #e5e7eb; border-radius:8px; padding:8px 10px; font-size:12px; }`}</style>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-[11px] font-semibold text-gray-500 mb-1">{label}</label>
-      {children}
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
     </div>
   );
 }

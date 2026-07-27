@@ -13,10 +13,17 @@ export async function hasConflict(
   professionalId: string,
   date: Date,
   time: string,
-  durationMin: number
+  durationMin: number,
+  excludeAppointmentId?: string
 ): Promise<boolean> {
   const dayAppointments = await prisma.appointment.findMany({
-    where: { salonId, professionalId, date, status: { not: "CANCELADO" } },
+    where: {
+      salonId,
+      professionalId,
+      date,
+      status: { not: "CANCELADO" },
+      ...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
+    },
     include: { service: true },
   });
 

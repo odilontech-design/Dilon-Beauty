@@ -34,6 +34,14 @@ export function addDaysUTC(date: Date, days: number): Date {
   return d;
 }
 
+export function startOfWeekUTC(date: Date): Date {
+  return addDaysUTC(date, -date.getUTCDay());
+}
+
+export function dateToISO(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
 export function formatDateBR(date: Date): string {
   return date.toLocaleDateString("pt-BR", { timeZone: "UTC" });
 }

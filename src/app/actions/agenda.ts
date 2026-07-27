@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/tenant";
+import { hasConflict } from "@/lib/scheduling";
 import { revalidatePath } from "next/cache";
 
 export async function createAppointment(formData: FormData) {
@@ -54,4 +55,48 @@ export async function updateAppointmentStatus(appointmentId: string, status: str
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
   revalidatePath("/financeiro");
+}
+
+export type RescheduleState = { ok: boolean; error?: string };
+
+export async function rescheduleAppointment(
+  appointmentId: string,
+  _prev: RescheduleState,
+  formData: FormData
+): Promise<RescheduleState> {
+  const tenant = await requireTenant();
+
+  const date = String(formData.get("date") || "");
+  const time = String(formData.get("time") || "");
+  if (!date || !time) return { ok: false, error: "Data e hora são obrigatórios." };
+
+  const parsedDate = new Date(date);
+  if (Number.isNaN(parsedDate.getTime())) return { ok: false, error: "Data inválida." };
+
+  const appt = await prisma.appointment.findFirst({
+    where: { id: appointmentId, salonId: tenant.salonId },
+    include: { service: true },
+  });
+  if (!appt) return { ok: false, error: "Agendamento não encontrado." };
+
+  const conflict = await hasConflict(
+    tenant.salonId,
+    appt.professionalId,
+    parsedDate,
+    time,
+    appt.service.durationMin,
+    appt.id
+  );
+  if (conflict) return { ok: false, error: "Esse profissional já tem outro agendamento nesse horário." };
+
+  await prisma.appointment.updateMany({
+    where: { id: appointmentId, salonId: tenant.salonId },
+    data: { date: parsedDate, time },
+  });
+
+  revalidatePath("/agenda");
+  revalidatePath("/dashboard");
+  revalidatePath("/financeiro");
+
+  return { ok: true };
 }
