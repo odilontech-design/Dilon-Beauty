@@ -17,8 +17,8 @@ export async function createAppointment(formData: FormData) {
   // da sessão — impede que alguém injete um id de outro tenant no form.
   const [client, professional, service] = await Promise.all([
     prisma.client.findFirst({ where: { id: clientId, salonId: tenant.salonId } }),
-    prisma.professional.findFirst({ where: { id: professionalId, salonId: tenant.salonId } }),
-    prisma.service.findFirst({ where: { id: serviceId, salonId: tenant.salonId } }),
+    prisma.professional.findFirst({ where: { id: professionalId, salonId: tenant.salonId, active: true } }),
+    prisma.service.findFirst({ where: { id: serviceId, salonId: tenant.salonId, active: true } }),
   ]);
   if (!client || !professional || !service) {
     throw new Error("Registro inválido para este salão.");

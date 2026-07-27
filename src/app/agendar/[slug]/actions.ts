@@ -30,7 +30,7 @@ export async function createPublicAppointment(
   // nunca confiamos nisso sem checar contra o slug resolvido no servidor.
   const [professional, service] = await Promise.all([
     prisma.professional.findFirst({ where: { id: professionalId, salonId: salon.id, active: true } }),
-    prisma.service.findFirst({ where: { id: serviceId, salonId: salon.id } }),
+    prisma.service.findFirst({ where: { id: serviceId, salonId: salon.id, active: true } }),
   ]);
   if (!professional || !service) {
     return { ok: false, error: "Profissional ou serviço inválido." };

@@ -16,7 +16,7 @@ export default async function AgendaPage() {
     }),
     prisma.client.findMany({ where: { salonId: tenant.salonId }, orderBy: { name: "asc" } }),
     prisma.professional.findMany({ where: { salonId: tenant.salonId, active: true } }),
-    prisma.service.findMany({ where: { salonId: tenant.salonId } }),
+    prisma.service.findMany({ where: { salonId: tenant.salonId, active: true } }),
   ]);
 
   return (

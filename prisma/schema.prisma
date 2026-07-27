@@ -81,10 +81,11 @@ model Professional {
 }
 
 model Service {
-  id          String @id @default(cuid())
+  id          String  @id @default(cuid())
   name        String
   price       Float
-  durationMin Int    @default(60)
+  durationMin Int     @default(60)
+  active      Boolean @default(true)
 
   salonId String
   salon   Salon  @relation(fields: [salonId], references: [id], onDelete: Cascade)

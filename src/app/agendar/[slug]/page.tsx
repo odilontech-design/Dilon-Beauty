@@ -11,7 +11,7 @@ export default async function AgendarPage({ params }: { params: { slug: string }
     where: { slug: params.slug },
     include: {
       professionals: { where: { active: true }, orderBy: { name: "asc" } },
-      services: { orderBy: { name: "asc" } },
+      services: { where: { active: true }, orderBy: { name: "asc" } },
     },
   });
 

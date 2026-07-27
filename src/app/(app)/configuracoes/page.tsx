@@ -3,11 +3,21 @@ import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/tenant";
 import { Card } from "@/components/ui";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
+import {
+  createProfessional,
+  setProfessionalActive,
+  createService,
+  setServiceActive,
+} from "@/app/actions/config";
 
 export default async function ConfiguracoesPage() {
   const tenant = await requireTenant();
 
-  const salon = await prisma.salon.findUnique({ where: { id: tenant.salonId } });
+  const [salon, professionals, services] = await Promise.all([
+    prisma.salon.findUnique({ where: { id: tenant.salonId } }),
+    prisma.professional.findMany({ where: { salonId: tenant.salonId }, orderBy: { name: "asc" } }),
+    prisma.service.findMany({ where: { salonId: tenant.salonId }, orderBy: { name: "asc" } }),
+  ]);
   if (!salon) return null;
 
   const host = headers().get("host") ?? "dilonbeauty.com.br";
@@ -18,7 +28,7 @@ export default async function ConfiguracoesPage() {
     <div>
       <h1 className="font-display font-extrabold text-xl text-navy mb-6">Configurações</h1>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4 mb-4">
         <Card>
           <div className="text-sm font-semibold text-navy mb-3">🔗 Link de agendamento</div>
           <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-xs text-teal-700 font-mono mb-2 break-all">
@@ -30,6 +40,11 @@ export default async function ConfiguracoesPage() {
             </p>
             <CopyLinkButton text={bookingLink} />
           </div>
+          {(professionals.filter((p) => p.active).length === 0 || services.filter((s) => s.active).length === 0) && (
+            <p className="text-[11px] mt-2" style={{ color: "#C0526E" }}>
+              Cadastre ao menos 1 profissional e 1 serviço ativos abaixo para o link público funcionar.
+            </p>
+          )}
         </Card>
 
         <Card>
@@ -47,6 +62,75 @@ export default async function ConfiguracoesPage() {
           ))}
         </Card>
       </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <Card>
+          <div className="text-sm font-semibold text-navy mb-3">💇 Profissionais</div>
+          <div className="space-y-1.5 mb-4">
+            {professionals.map((p) => (
+              <div key={p.id} className="flex items-center justify-between text-xs py-1.5 border-b border-gray-50">
+                <div>
+                  <span className={`font-medium ${p.active ? "text-navy" : "text-gray-400 line-through"}`}>
+                    {p.name}
+                  </span>
+                  {p.role && <span className="text-gray-400"> — {p.role}</span>}
+                </div>
+                <form action={setProfessionalActive.bind(null, p.id, !p.active)}>
+                  <button className="text-[10px] font-semibold text-teal-700 hover:underline" style={{ color: p.active ? "#C0526E" : "#00B8A0" }}>
+                    {p.active ? "Desativar" : "Reativar"}
+                  </button>
+                </form>
+              </div>
+            ))}
+            {professionals.length === 0 && (
+              <p className="text-xs text-gray-400 py-2">Nenhum profissional cadastrado ainda.</p>
+            )}
+          </div>
+          <form action={createProfessional} className="space-y-2">
+            <input name="name" required className="input" placeholder="Nome do profissional" />
+            <input name="role" className="input" placeholder="Função (ex: Cabeleireira)" />
+            <button type="submit" className="w-full bg-navy text-white text-xs font-semibold rounded-lg py-2">
+              Adicionar profissional
+            </button>
+          </form>
+        </Card>
+
+        <Card>
+          <div className="text-sm font-semibold text-navy mb-3">✂️ Serviços</div>
+          <div className="space-y-1.5 mb-4">
+            {services.map((s) => (
+              <div key={s.id} className="flex items-center justify-between text-xs py-1.5 border-b border-gray-50">
+                <div>
+                  <span className={`font-medium ${s.active ? "text-navy" : "text-gray-400 line-through"}`}>
+                    {s.name}
+                  </span>
+                  <span className="text-gray-400"> — R$ {s.price.toFixed(2)}</span>
+                </div>
+                <form action={setServiceActive.bind(null, s.id, !s.active)}>
+                  <button className="text-[10px] font-semibold hover:underline" style={{ color: s.active ? "#C0526E" : "#00B8A0" }}>
+                    {s.active ? "Desativar" : "Reativar"}
+                  </button>
+                </form>
+              </div>
+            ))}
+            {services.length === 0 && (
+              <p className="text-xs text-gray-400 py-2">Nenhum serviço cadastrado ainda.</p>
+            )}
+          </div>
+          <form action={createService} className="space-y-2">
+            <input name="name" required className="input" placeholder="Nome do serviço" />
+            <div className="grid grid-cols-2 gap-2">
+              <input name="price" type="number" step="0.01" min="0" required className="input" placeholder="Preço (R$)" />
+              <input name="durationMin" type="number" min="5" defaultValue={60} className="input" placeholder="Duração (min)" />
+            </div>
+            <button type="submit" className="w-full bg-navy text-white text-xs font-semibold rounded-lg py-2">
+              Adicionar serviço
+            </button>
+          </form>
+        </Card>
+      </div>
+
+      <style>{`.input{ width:100%; border:1px solid #e5e7eb; border-radius:8px; padding:8px 10px; font-size:12px; }`}</style>
     </div>
   );
 }
