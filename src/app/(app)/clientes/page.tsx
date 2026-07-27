@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/tenant";
 import { Card } from "@/components/ui";
 import { createClient } from "@/app/actions/clientes";
+import { ClientRow } from "./ClientRow";
 
 export default async function ClientesPage() {
   const tenant = await requireTenant();
@@ -25,19 +26,26 @@ export default async function ClientesPage() {
                 <th className="py-2 font-semibold">Nome</th>
                 <th className="font-semibold">WhatsApp</th>
                 <th className="font-semibold">Atendimentos</th>
+                <th className="font-semibold">Ações</th>
               </tr>
             </thead>
             <tbody>
               {clients.map((c) => (
-                <tr key={c.id} className="border-b border-gray-50">
-                  <td className="py-2.5 font-medium text-navy">{c.name}</td>
-                  <td className="text-gray-500">{c.phone || "—"}</td>
-                  <td>{c.appointments.length}</td>
-                </tr>
+                <ClientRow
+                  key={c.id}
+                  salonName={tenant.salonName}
+                  client={{
+                    id: c.id,
+                    name: c.name,
+                    phone: c.phone,
+                    notes: c.notes,
+                    appointmentsCount: c.appointments.length,
+                  }}
+                />
               ))}
               {clients.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="py-6 text-center text-gray-400">
+                  <td colSpan={4} className="py-6 text-center text-gray-400">
                     Nenhuma cliente cadastrada ainda.
                   </td>
                 </tr>
