@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import QRCode from "qrcode";
 import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/tenant";
 import { Card } from "@/components/ui";
@@ -23,6 +24,11 @@ export default async function ConfiguracoesPage() {
   const host = headers().get("host") ?? "dilonbeauty.com.br";
   const protocol = host.startsWith("localhost") ? "http" : "https";
   const bookingLink = `${protocol}://${host}/agendar/${salon.slug}`;
+  const qrCodeDataUrl = await QRCode.toDataURL(bookingLink, {
+    width: 240,
+    margin: 1,
+    color: { dark: "#03254C", light: "#FFFFFF" },
+  });
 
   return (
     <div>
@@ -31,15 +37,34 @@ export default async function ConfiguracoesPage() {
       <div className="grid grid-cols-2 gap-4 mb-4">
         <Card>
           <div className="text-sm font-semibold text-navy mb-3">🔗 Link de agendamento</div>
-          <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-xs text-teal-700 font-mono mb-2 break-all">
-            {bookingLink}
+          <div className="flex flex-col xl:flex-row items-start gap-4">
+            <img
+              src={qrCodeDataUrl}
+              alt={`QR code para agendamento do ${salon.name}`}
+              width={96}
+              height={96}
+              className="rounded-lg border border-gray-200 shrink-0 w-24 h-24 object-contain"
+            />
+            <div className="flex-1 min-w-0 w-full">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-xs text-teal-700 font-mono mb-2 break-all">
+                {bookingLink}
+              </div>
+              <div className="flex items-center gap-3">
+                <CopyLinkButton text={bookingLink} />
+                <a
+                  href={qrCodeDataUrl}
+                  download={`qrcode-agendamento-${salon.slug}.png`}
+                  className="text-[11px] font-semibold hover:underline"
+                  style={{ color: "#00B8A0" }}
+                >
+                  Baixar QR Code
+                </a>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] text-gray-500">
-              Compartilhe esse link na bio do Instagram e no WhatsApp para suas clientes agendarem sozinhas.
-            </p>
-            <CopyLinkButton text={bookingLink} />
-          </div>
+          <p className="text-[11px] text-gray-500 mt-3">
+            Compartilhe o link ou o QR code na bio do Instagram, no WhatsApp ou impresso no salão para suas clientes agendarem sozinhas.
+          </p>
           {(professionals.filter((p) => p.active).length === 0 || services.filter((s) => s.active).length === 0) && (
             <p className="text-[11px] mt-2" style={{ color: "#C0526E" }}>
               Cadastre ao menos 1 profissional e 1 serviço ativos abaixo para o link público funcionar.
