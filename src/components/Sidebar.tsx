@@ -22,7 +22,7 @@ export function Sidebar({
   const pathname = usePathname();
 
   return (
-    <div className="w-56 h-screen bg-navyDeep text-white flex flex-col shrink-0">
+    <div className="w-56 h-screen sticky top-0 bg-navyDeep text-white flex flex-col shrink-0">
       <div className="p-4 border-b border-white/10">
         <div className="font-display font-bold text-sm">{salonName}</div>
         <div className="text-[10px] text-white/50 mt-0.5">Dilon Tech · Painel do Dono</div>

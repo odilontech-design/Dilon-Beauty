@@ -3,6 +3,7 @@ import { requireTenant } from "@/lib/tenant";
 import { Card, StatusBadge } from "@/components/ui";
 import { createAppointment, updateAppointmentStatus } from "@/app/actions/agenda";
 import { formatDateBR } from "@/lib/date";
+import { WhatsAppButton } from "@/components/WhatsAppButton";
 
 export default async function AgendaPage() {
   const tenant = await requireTenant();
@@ -31,8 +32,10 @@ export default async function AgendaPage() {
               <tr className="text-left text-gray-400 border-b border-gray-100">
                 <th className="py-2 font-semibold">Data</th>
                 <th className="font-semibold">Hora</th>
+                <th className="font-semibold"></th>
                 <th className="font-semibold">Cliente</th>
                 <th className="font-semibold">Serviço</th>
+                <th className="font-semibold">Valor</th>
                 <th className="font-semibold">Status</th>
                 <th></th>
               </tr>
@@ -42,8 +45,17 @@ export default async function AgendaPage() {
                 <tr key={a.id} className="border-b border-gray-50">
                   <td className="py-2.5">{formatDateBR(a.date)}</td>
                   <td className="font-bold text-navy">{a.time}</td>
+                  <td>
+                    <WhatsAppButton
+                      phone={a.client.phone}
+                      message={`Olá ${a.client.name}! Aqui é do ${tenant.salonName}.`}
+                    />
+                  </td>
                   <td>{a.client.name}</td>
                   <td className="text-gray-400">{a.service.name}</td>
+                  <td className="font-semibold text-navy">
+                    {a.price.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                  </td>
                   <td><StatusBadge status={a.status} /></td>
                   <td>
                     {a.status !== "CONCLUIDO" && a.status !== "CANCELADO" && (
@@ -58,7 +70,7 @@ export default async function AgendaPage() {
               ))}
               {appointments.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-6 text-center text-gray-400">
+                  <td colSpan={8} className="py-6 text-center text-gray-400">
                     Nenhum agendamento ainda. Cadastre o primeiro ao lado.
                   </td>
                 </tr>
