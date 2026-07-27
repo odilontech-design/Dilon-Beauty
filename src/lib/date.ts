@@ -37,3 +37,19 @@ export function addDaysUTC(date: Date, days: number): Date {
 export function formatDateBR(date: Date): string {
   return date.toLocaleDateString("pt-BR", { timeZone: "UTC" });
 }
+
+export function todayDateStrInSalonTZ(): string {
+  const { year, month, day } = todayPartsInSalonTZ();
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+export function currentMinutesInSalonTZ(): number {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: SALON_TIMEZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date());
+  const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  return Number(map.hour) * 60 + Number(map.minute);
+}

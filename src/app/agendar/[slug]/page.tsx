@@ -25,8 +25,9 @@ export default async function AgendarPage({ params }: { params: { slug: string }
       {canBook ? (
         <BookingForm
           slug={salon.slug}
+          salonName={salon.name}
           professionals={salon.professionals.map((p) => ({ id: p.id, name: p.name, role: p.role }))}
-          services={salon.services.map((s) => ({ id: s.id, name: s.name, price: s.price }))}
+          services={salon.services.map((s) => ({ id: s.id, name: s.name, price: s.price, durationMin: s.durationMin }))}
           whatsapp={salon.whatsapp}
         />
       ) : (

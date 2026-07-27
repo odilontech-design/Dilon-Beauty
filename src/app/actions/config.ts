@@ -59,3 +59,23 @@ export async function setServiceActive(id: string, active: boolean) {
   revalidatePath("/configuracoes");
   revalidatePath("/agenda");
 }
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+export async function setBusinessHours(formData: FormData) {
+  const tenant = await requireTenant();
+
+  const openTime = String(formData.get("openTime") ?? "");
+  const closeTime = String(formData.get("closeTime") ?? "");
+  if (!HHMM.test(openTime) || !HHMM.test(closeTime) || openTime >= closeTime) {
+    throw new Error("Horário de funcionamento inválido.");
+  }
+
+  await prisma.salon.update({
+    where: { id: tenant.salonId },
+    data: { openTime, closeTime },
+  });
+
+  revalidatePath("/configuracoes");
+  revalidatePath("/agendar");
+}

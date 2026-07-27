@@ -40,6 +40,8 @@ model Salon {
   plan      Plan     @default(STARTER)
   whatsapp  String? // número usado no botão de redirecionamento
   address   String?
+  openTime  String   @default("09:00") // horário de abertura, usado pra calcular horários livres no link público
+  closeTime String   @default("19:00") // horário de fechamento
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

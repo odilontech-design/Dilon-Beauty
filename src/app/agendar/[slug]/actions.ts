@@ -1,10 +1,42 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { isSlotTaken } from "@/lib/scheduling";
+import { hasConflict } from "@/lib/scheduling";
+import { getAvailableTimes } from "@/lib/availability";
 import { revalidatePath } from "next/cache";
 
 export type PublicBookingState = { ok: boolean; error?: string };
+
+export async function fetchAvailableTimes(
+  slug: string,
+  professionalId: string,
+  serviceId: string,
+  date: string
+): Promise<string[]> {
+  if (!professionalId || !serviceId || !date) return [];
+
+  const salon = await prisma.salon.findUnique({ where: { slug } });
+  if (!salon) return [];
+
+  const [professional, service] = await Promise.all([
+    prisma.professional.findFirst({ where: { id: professionalId, salonId: salon.id, active: true } }),
+    prisma.service.findFirst({ where: { id: serviceId, salonId: salon.id, active: true } }),
+  ]);
+  if (!professional || !service) return [];
+
+  const parsedDate = new Date(date);
+  if (Number.isNaN(parsedDate.getTime())) return [];
+
+  return getAvailableTimes({
+    salonId: salon.id,
+    professionalId: professional.id,
+    date: parsedDate,
+    dateStr: date,
+    durationMin: service.durationMin,
+    openTime: salon.openTime,
+    closeTime: salon.closeTime,
+  });
+}
 
 export async function createPublicAppointment(
   slug: string,
@@ -41,8 +73,11 @@ export async function createPublicAppointment(
     return { ok: false, error: "Data inválida." };
   }
 
-  const taken = await isSlotTaken(salon.id, professional.id, parsedDate, time);
-  if (taken) {
+  // Revalida contra a agenda real no momento do envio — o <select> de
+  // horários já só mostra vagas livres, mas isso cobre a corrida de duas
+  // clientes escolhendo o mesmo horário ao mesmo tempo.
+  const conflict = await hasConflict(salon.id, professional.id, parsedDate, time, service.durationMin);
+  if (conflict) {
     return { ok: false, error: "Esse horário acabou de ser preenchido. Escolha outro horário." };
   }
 

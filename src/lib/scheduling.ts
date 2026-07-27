@@ -1,22 +1,31 @@
 import { prisma } from "@/lib/prisma";
 
+function toMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+}
+
 // Usado tanto pela agenda interna quanto pelo link público de agendamento
-// para impedir que dois agendamentos caiam no mesmo profissional/data/hora.
-export async function isSlotTaken(
+// pra impedir que dois agendamentos do mesmo profissional se sobreponham,
+// considerando a duração de cada serviço (não só o horário de início).
+export async function hasConflict(
   salonId: string,
   professionalId: string,
   date: Date,
-  time: string
-) {
-  const existing = await prisma.appointment.findFirst({
-    where: {
-      salonId,
-      professionalId,
-      date,
-      time,
-      status: { not: "CANCELADO" },
-    },
-    select: { id: true },
+  time: string,
+  durationMin: number
+): Promise<boolean> {
+  const dayAppointments = await prisma.appointment.findMany({
+    where: { salonId, professionalId, date, status: { not: "CANCELADO" } },
+    include: { service: true },
   });
-  return !!existing;
+
+  const start = toMinutes(time);
+  const end = start + durationMin;
+
+  return dayAppointments.some((appt) => {
+    const otherStart = toMinutes(appt.time);
+    const otherEnd = otherStart + (appt.service?.durationMin ?? 60);
+    return start < otherEnd && otherStart < end;
+  });
 }

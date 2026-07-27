@@ -9,6 +9,7 @@ import {
   setProfessionalActive,
   createService,
   setServiceActive,
+  setBusinessHours,
 } from "@/app/actions/config";
 
 export default async function ConfiguracoesPage() {
@@ -85,6 +86,23 @@ export default async function ConfiguracoesPage() {
               <span className="font-semibold text-navy">{v}</span>
             </div>
           ))}
+
+          <div className="text-[11px] font-semibold text-gray-500 mt-4 mb-2">
+            Horário de funcionamento (usado pra calcular os horários livres no link público)
+          </div>
+          <form action={setBusinessHours} className="flex items-end gap-2">
+            <div className="flex-1">
+              <label className="block text-[10px] text-gray-400 mb-1">Abre</label>
+              <input type="time" name="openTime" required defaultValue={salon.openTime} className="input" />
+            </div>
+            <div className="flex-1">
+              <label className="block text-[10px] text-gray-400 mb-1">Fecha</label>
+              <input type="time" name="closeTime" required defaultValue={salon.closeTime} className="input" />
+            </div>
+            <button type="submit" className="bg-navy text-white text-xs font-semibold rounded-lg py-2 px-3">
+              Salvar
+            </button>
+          </form>
         </Card>
       </div>
 
