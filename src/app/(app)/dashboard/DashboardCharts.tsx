@@ -31,7 +31,7 @@ export function DashboardCharts({
   const hasPieData = pieData.some((d) => d.value > 0);
 
   return (
-    <div className="grid grid-cols-2 gap-4 mb-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
       <Card>
         <div className="text-sm font-semibold text-navy mb-3">Agendamentos nos últimos 7 dias</div>
         <ResponsiveContainer width="100%" height={220}>

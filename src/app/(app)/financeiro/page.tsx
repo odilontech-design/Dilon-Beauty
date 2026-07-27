@@ -54,7 +54,7 @@ export default async function FinanceiroPage() {
     <div>
       <h1 className="font-display font-extrabold text-xl text-navy mb-6">Financeiro</h1>
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <Kpi label="Receita hoje" value={todayRevenue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
         <Kpi label="Receita do mês" value={monthRevenue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} sub={`${monthAppts.length} atendimentos concluídos`} />
         <Kpi label="Ticket médio" value={avgTicket.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
@@ -64,7 +64,8 @@ export default async function FinanceiroPage() {
 
       <Card>
         <div className="text-sm font-semibold text-navy mb-3">Extrato de hoje</div>
-        <table className="w-full text-xs">
+        <div className="overflow-x-auto">
+        <table className="w-full text-xs min-w-[420px]">
           <thead>
             <tr className="text-left text-gray-400 border-b border-gray-100">
               <th className="py-2 font-semibold">Hora</th>
@@ -93,6 +94,7 @@ export default async function FinanceiroPage() {
             )}
           </tbody>
         </table>
+        </div>
       </Card>
     </div>
   );

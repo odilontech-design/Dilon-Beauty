@@ -10,6 +10,7 @@ import {
   createService,
   setServiceActive,
   setBusinessHours,
+  setLogo,
 } from "@/app/actions/config";
 
 export default async function ConfiguracoesPage() {
@@ -35,7 +36,7 @@ export default async function ConfiguracoesPage() {
     <div>
       <h1 className="font-display font-extrabold text-xl text-navy mb-6">Configurações</h1>
 
-      <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <Card>
           <div className="text-sm font-semibold text-navy mb-3">🔗 Link de agendamento</div>
           <div className="flex flex-col xl:flex-row items-start gap-4">
@@ -104,9 +105,37 @@ export default async function ConfiguracoesPage() {
             </button>
           </form>
         </Card>
+
+        <Card>
+          <div className="text-sm font-semibold text-navy mb-3">🖼️ Logo do salão</div>
+          <div className="flex items-center gap-3 mb-3">
+            {salon.logoUrl ? (
+              <img src={salon.logoUrl} alt="Logo" className="w-14 h-14 rounded-lg object-cover border border-gray-200" />
+            ) : (
+              <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center text-gray-300 text-xl">
+                🖼️
+              </div>
+            )}
+            <p className="text-[11px] text-gray-500 flex-1">
+              Cole o link de uma imagem já hospedada (Google Drive, Imgur, seu site etc). Ela aparece no menu do
+              painel e na página pública de agendamento.
+            </p>
+          </div>
+          <form action={setLogo} className="flex gap-2">
+            <input
+              name="logoUrl"
+              defaultValue={salon.logoUrl ?? ""}
+              className="input flex-1"
+              placeholder="https://..."
+            />
+            <button type="submit" className="bg-navy text-white text-xs font-semibold rounded-lg py-2 px-3 whitespace-nowrap">
+              Salvar
+            </button>
+          </form>
+        </Card>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <div className="text-sm font-semibold text-navy mb-3">💇 Profissionais</div>
           <div className="space-y-1.5 mb-4">

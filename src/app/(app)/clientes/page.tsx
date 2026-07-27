@@ -17,10 +17,11 @@ export default async function ClientesPage() {
     <div>
       <h1 className="font-display font-extrabold text-xl text-navy mb-6">Clientes</h1>
 
-      <div className="grid grid-cols-[1fr_280px] gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] gap-6">
         <Card>
           <div className="text-sm font-semibold text-navy mb-3">{clients.length} clientes cadastradas</div>
-          <table className="w-full text-xs">
+          <div className="overflow-x-auto">
+          <table className="w-full text-xs min-w-[480px]">
             <thead>
               <tr className="text-left text-gray-400 border-b border-gray-100">
                 <th className="py-2 font-semibold">Nome</th>
@@ -52,6 +53,7 @@ export default async function ClientesPage() {
               )}
             </tbody>
           </table>
+          </div>
         </Card>
 
         <Card>

@@ -53,7 +53,7 @@ export default async function DashboardPage() {
       </h1>
       <p className="text-sm text-gray-500 mb-6">Aqui está o resumo do seu dia em {tenant.salonName}.</p>
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <Kpi label="Agendamentos hoje" value={String(todayAppts.length)} />
         <Kpi label="Receita do dia" value={revenue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
         <Kpi label="Aguardando confirmação" value={String(pending)} />

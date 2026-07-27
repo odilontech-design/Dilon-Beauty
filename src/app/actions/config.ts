@@ -79,3 +79,24 @@ export async function setBusinessHours(formData: FormData) {
   revalidatePath("/configuracoes");
   revalidatePath("/agendar");
 }
+
+export async function setLogo(formData: FormData) {
+  const tenant = await requireTenant();
+
+  const logoUrl = String(formData.get("logoUrl") ?? "").trim();
+  if (logoUrl && !/^https?:\/\//.test(logoUrl)) {
+    throw new Error("Cole um link que comece com http:// ou https://");
+  }
+
+  await prisma.salon.update({
+    where: { id: tenant.salonId },
+    data: { logoUrl: logoUrl || null },
+  });
+
+  revalidatePath("/configuracoes");
+  revalidatePath("/agendar");
+  revalidatePath("/dashboard");
+  revalidatePath("/agenda");
+  revalidatePath("/clientes");
+  revalidatePath("/financeiro");
+}

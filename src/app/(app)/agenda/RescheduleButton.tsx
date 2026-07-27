@@ -37,7 +37,7 @@ export function RescheduleButton({
 
       <Modal open={open} onClose={() => setOpen(false)} title="Reagendar">
         <form action={formAction} className="space-y-3">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <label className="block text-[11px] font-semibold text-gray-500 mb-1">Nova data</label>
               <input type="date" name="date" required defaultValue={currentDate} className="input" />

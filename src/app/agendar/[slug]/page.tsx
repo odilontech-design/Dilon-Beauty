@@ -21,7 +21,7 @@ export default async function AgendarPage({ params }: { params: { slug: string }
   const canBook = salon.professionals.length > 0 && salon.services.length > 0;
 
   return (
-    <AgendarShell salonName={salon.name}>
+    <AgendarShell salonName={salon.name} logoUrl={salon.logoUrl}>
       {canBook ? (
         <BookingForm
           slug={salon.slug}

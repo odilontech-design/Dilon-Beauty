@@ -17,7 +17,7 @@ export function FinanceiroCharts({
   const hasServiceData = revenueByService.length > 0;
 
   return (
-    <div className="grid grid-cols-2 gap-4 mb-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
       <Card>
         <div className="text-sm font-semibold text-navy mb-3">Receita por dia (mês atual)</div>
         <ResponsiveContainer width="100%" height={220}>

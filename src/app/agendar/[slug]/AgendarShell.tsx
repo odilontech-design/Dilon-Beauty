@@ -8,7 +8,15 @@ const STORAGE_KEY = "dilon-beauty-agendar-theme";
 // fundo da página e o cabeçalho mudam. Estado inicia em "dark" (igual ao
 // que o servidor renderiza) pra não piscar tema errado no primeiro load;
 // só troca depois se a visitante já tinha escolhido "light" antes.
-export function AgendarShell({ salonName, children }: { salonName: string; children: React.ReactNode }) {
+export function AgendarShell({
+  salonName,
+  logoUrl,
+  children,
+}: {
+  salonName: string;
+  logoUrl: string | null;
+  children: React.ReactNode;
+}) {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
 
   useEffect(() => {
@@ -43,6 +51,13 @@ export function AgendarShell({ salonName, children }: { salonName: string; child
         </button>
 
         <div className="text-center mb-6 px-10">
+          {logoUrl && (
+            <img
+              src={logoUrl}
+              alt={salonName}
+              className="w-14 h-14 rounded-xl object-cover mx-auto mb-2 border border-white/10"
+            />
+          )}
           <div className={`font-display font-extrabold text-xl sm:text-2xl break-words ${dark ? "text-white" : "text-navy"}`}>
             {salonName}
           </div>
