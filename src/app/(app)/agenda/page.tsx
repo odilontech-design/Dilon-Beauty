@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/tenant";
 import { Card, StatusBadge } from "@/components/ui";
 import { createAppointment, updateAppointmentStatus } from "@/app/actions/agenda";
+import { formatDateBR } from "@/lib/date";
 
 export default async function AgendaPage() {
   const tenant = await requireTenant();
@@ -39,7 +40,7 @@ export default async function AgendaPage() {
             <tbody>
               {appointments.map((a) => (
                 <tr key={a.id} className="border-b border-gray-50">
-                  <td className="py-2.5">{a.date.toLocaleDateString("pt-BR")}</td>
+                  <td className="py-2.5">{formatDateBR(a.date)}</td>
                   <td className="font-bold text-navy">{a.time}</td>
                   <td>{a.client.name}</td>
                   <td className="text-gray-400">{a.service.name}</td>

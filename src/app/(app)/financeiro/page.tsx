@@ -1,23 +1,21 @@
 import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/tenant";
 import { Card, Kpi, StatusBadge } from "@/components/ui";
+import { todayUTCDate, addDaysUTC, startOfMonthUTCDate } from "@/lib/date";
 
 export default async function FinanceiroPage() {
   const tenant = await requireTenant();
 
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date();
-  endOfDay.setHours(23, 59, 59, 999);
+  const startOfMonth = startOfMonthUTCDate();
+  const startOfDay = todayUTCDate();
+  const endOfDay = addDaysUTC(startOfDay, 1);
 
   const [monthAppts, todayAppts] = await Promise.all([
     prisma.appointment.findMany({
       where: { salonId: tenant.salonId, date: { gte: startOfMonth }, status: "CONCLUIDO" },
     }),
     prisma.appointment.findMany({
-      where: { salonId: tenant.salonId, date: { gte: startOfDay, lte: endOfDay } },
+      where: { salonId: tenant.salonId, date: { gte: startOfDay, lt: endOfDay } },
       include: { client: true, service: true },
       orderBy: { time: "asc" },
     }),

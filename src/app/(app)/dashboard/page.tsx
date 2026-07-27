@@ -1,18 +1,17 @@
 import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/tenant";
 import { Card, Kpi, StatusBadge } from "@/components/ui";
+import { todayUTCDate, addDaysUTC } from "@/lib/date";
 
 export default async function DashboardPage() {
   const tenant = await requireTenant();
 
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date();
-  endOfDay.setHours(23, 59, 59, 999);
+  const startOfDay = todayUTCDate();
+  const endOfDay = addDaysUTC(startOfDay, 1);
 
   // Toda leitura filtrada por salonId — é o que separa os dados de cada cliente.
   const todayAppts = await prisma.appointment.findMany({
-    where: { salonId: tenant.salonId, date: { gte: startOfDay, lte: endOfDay } },
+    where: { salonId: tenant.salonId, date: { gte: startOfDay, lt: endOfDay } },
     include: { client: true, professional: true, service: true },
     orderBy: { time: "asc" },
   });
