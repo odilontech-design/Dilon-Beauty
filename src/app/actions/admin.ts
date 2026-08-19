@@ -51,6 +51,7 @@ export async function adminCreateSalon(_prev: CreateSalonState, formData: FormDa
   const ownerName = String(formData.get("ownerName") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const whatsapp = String(formData.get("whatsapp") ?? "").trim();
+  const trialDays = Number(formData.get("trialDays") ?? 0);
 
   if (!salonName || !ownerName || !email) {
     return { ok: false, error: "Nome do salão, nome da dona e e-mail são obrigatórios." };
@@ -67,6 +68,10 @@ export async function adminCreateSalon(_prev: CreateSalonState, formData: FormDa
   const slug = await uniqueSlugFrom(salonName);
   const password = crypto.randomBytes(6).toString("base64url");
   const passwordHash = await bcrypt.hash(password, 10);
+  const trialEndsAt =
+    Number.isFinite(trialDays) && trialDays > 0
+      ? new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000)
+      : null;
 
   await prisma.salon.create({
     data: {
@@ -74,6 +79,7 @@ export async function adminCreateSalon(_prev: CreateSalonState, formData: FormDa
       slug,
       plan: "STARTER",
       whatsapp: whatsapp || null,
+      trialEndsAt,
       users: {
         create: { name: ownerName, email, passwordHash, role: "OWNER" },
       },
@@ -82,4 +88,51 @@ export async function adminCreateSalon(_prev: CreateSalonState, formData: FormDa
 
   revalidatePath("/admin");
   return { ok: true, password, slug };
+}
+
+export type UpdateSalonState = { ok: boolean; error?: string };
+
+export async function adminUpdateSalon(salonId: string, _prev: UpdateSalonState, formData: FormData): Promise<UpdateSalonState> {
+  await requireAdmin();
+
+  const plan = String(formData.get("plan") ?? "");
+  const active = formData.get("active") === "on";
+  const trialEndsAtRaw = String(formData.get("trialEndsAt") ?? "");
+
+  if (!["STARTER", "PROFISSIONAL", "CLINIC"].includes(plan)) {
+    return { ok: false, error: "Plano inválido." };
+  }
+
+  let trialEndsAt: Date | null = null;
+  if (trialEndsAtRaw) {
+    trialEndsAt = new Date(trialEndsAtRaw);
+    if (Number.isNaN(trialEndsAt.getTime())) {
+      return { ok: false, error: "Data de trial inválida." };
+    }
+  }
+
+  await prisma.salon.update({
+    where: { id: salonId },
+    data: { plan: plan as any, active, trialEndsAt },
+  });
+
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+export type ResetPasswordState = { ok: boolean; error?: string; password?: string };
+
+export async function adminResetPassword(salonId: string, _prev: ResetPasswordState, _formData: FormData): Promise<ResetPasswordState> {
+  await requireAdmin();
+
+  const owner = await prisma.user.findFirst({ where: { salonId }, orderBy: { createdAt: "asc" } });
+  if (!owner) return { ok: false, error: "Nenhum usuário encontrado para esse salão." };
+
+  const password = crypto.randomBytes(6).toString("base64url");
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  await prisma.user.update({ where: { id: owner.id }, data: { passwordHash } });
+
+  revalidatePath("/admin");
+  return { ok: true, password };
 }

@@ -43,8 +43,10 @@ model Salon {
   openTime  String   @default("09:00") // horário de abertura, usado pra calcular horários livres no link público
   closeTime String   @default("19:00") // horário de fechamento
   logoUrl   String? // link de uma imagem já hospedada (ex: Google Drive, Imgur) — sem upload de arquivo por enquanto
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  active      Boolean   @default(true) // desativado pelo admin = login e link público de agendamento bloqueados
+  trialEndsAt DateTime? // só informativo — acompanhamento é manual, não bloqueia acesso sozinho
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   users         User[]
   professionals Professional[]

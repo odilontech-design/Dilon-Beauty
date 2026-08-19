@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "./auth";
+import { prisma } from "./prisma";
 
 export type TenantSession = {
   userId: string;
@@ -25,6 +26,15 @@ export async function requireTenant(): Promise<TenantSession> {
   }
 
   const u = session.user as any;
+
+  // Sessão é um JWT (não checa o banco a cada request) — se um admin
+  // desativar o salão no meio da sessão de alguém, isso garante que o
+  // bloqueio vale já no próximo carregamento de página, não só no login.
+  const salon = await prisma.salon.findUnique({ where: { id: u.salonId }, select: { active: true } });
+  if (!salon || !salon.active) {
+    redirect("/login");
+  }
+
   return {
     userId: u.id ?? u.sub,
     userName: u.name,

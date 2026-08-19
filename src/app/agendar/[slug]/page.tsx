@@ -16,7 +16,7 @@ export default async function AgendarPage({ params }: { params: { slug: string }
     },
   });
 
-  if (!salon) notFound();
+  if (!salon || !salon.active) notFound();
 
   const canBook = salon.professionals.length > 0 && salon.services.length > 0;
 

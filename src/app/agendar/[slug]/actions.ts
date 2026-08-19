@@ -16,7 +16,7 @@ export async function fetchAvailableTimes(
   if (!professionalId || !serviceId || !date) return [];
 
   const salon = await prisma.salon.findUnique({ where: { slug } });
-  if (!salon) return [];
+  if (!salon || !salon.active) return [];
 
   const [professional, service] = await Promise.all([
     prisma.professional.findFirst({ where: { id: professionalId, salonId: salon.id, active: true } }),
@@ -44,7 +44,7 @@ export async function createPublicAppointment(
   formData: FormData
 ): Promise<PublicBookingState> {
   const salon = await prisma.salon.findUnique({ where: { slug } });
-  if (!salon) return { ok: false, error: "Salão não encontrado." };
+  if (!salon || !salon.active) return { ok: false, error: "Salão não encontrado." };
 
   const name = String(formData.get("name") || "").trim();
   const phone = String(formData.get("phone") || "").trim();

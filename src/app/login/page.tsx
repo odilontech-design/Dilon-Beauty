@@ -26,7 +26,11 @@ function LoginForm() {
     setLoading(false);
 
     if (res?.error) {
-      setError("E-mail ou senha incorretos.");
+      setError(
+        res.error === "SALON_INACTIVE"
+          ? "Essa conta está temporariamente desativada. Fale com o suporte do Dilon Beauty."
+          : "E-mail ou senha incorretos."
+      );
       return;
     }
     router.push("/dashboard");

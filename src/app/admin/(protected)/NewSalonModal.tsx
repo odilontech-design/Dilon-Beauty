@@ -70,6 +70,9 @@ function NewSalonForm({ onClose }: { onClose: () => void }) {
       <Field label="WhatsApp (opcional)">
         <input name="whatsapp" className="input" placeholder="5521900000000" />
       </Field>
+      <Field label="Dias de trial (0 = sem trial, já cobra)">
+        <input name="trialDays" type="number" min="0" defaultValue={7} className="input" />
+      </Field>
 
       {state.error && <p className="text-xs text-red-500">{state.error}</p>}
 

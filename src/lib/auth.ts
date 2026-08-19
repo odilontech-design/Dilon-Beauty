@@ -27,6 +27,10 @@ export const authOptions: AuthOptions = {
         const valid = await bcrypt.compare(credentials.password, user.passwordHash);
         if (!valid) return null;
 
+        if (!user.salon.active) {
+          throw new Error("SALON_INACTIVE");
+        }
+
         // O que entra aqui vira o "token" — é o que define de qual salão
         // (tenant) esse usuário pode enxergar dados. Nunca deixe o cliente
         // escolher o salonId; ele sempre vem do usuário autenticado.
