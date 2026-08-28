@@ -32,6 +32,22 @@ enum AppointmentStatus {
   CANCELADO
 }
 
+// ─── FINANCEIRO ────────────────────────────────────────────────────────────
+enum FinanceOwner {
+  PJ // conta/gasto da empresa (CNPJ)
+  PF // conta/gasto pessoal do dono (CPF)
+}
+
+enum FinanceFlow {
+  ENTRADA
+  SAIDA
+}
+
+enum FinanceSource {
+  MANUAL
+  IMPORTACAO
+}
+
 // ─── TENANT ────────────────────────────────────────────────────────────────
 model Salon {
   id        String   @id @default(cuid())
@@ -53,6 +69,10 @@ model Salon {
   services      Service[]
   clients       Client[]
   appointments  Appointment[]
+
+  financeCategories    FinanceCategory[]
+  bankImports          BankImport[]
+  financeTransactions  FinanceTransaction[]
 }
 
 // ─── AUTH ──────────────────────────────────────────────────────────────────
@@ -136,4 +156,72 @@ model Appointment {
   createdAt DateTime @default(now())
 
   @@index([salonId, date])
+}
+
+// Categoria de receita/despesa. "owner" fixo (PF ou PJ) restringe a categoria
+// pra um lado só (ex: "Pró-labore Recebido" só existe do lado PF); owner nulo
+// = serve pros dois (ex: "Transferência entre contas").
+model FinanceCategory {
+  id       String       @id @default(cuid())
+  name     String
+  flow     FinanceFlow
+  owner    FinanceOwner?
+  keywords String? // termos separados por vírgula usados na sugestão automática ao importar extrato
+  isSystem Boolean      @default(false) // categoria padrão criada automaticamente, não pode ser apagada
+
+  salonId String
+  salon   Salon  @relation(fields: [salonId], references: [id], onDelete: Cascade)
+
+  transactions FinanceTransaction[]
+
+  @@unique([salonId, name, flow])
+  @@index([salonId])
+}
+
+// Um extrato bancário importado de uma vez (um arquivo = um import).
+// Tudo que ele carrega já nasce marcado como PF ou PJ, porque essa é a
+// separação que interessa: a conta de origem do extrato.
+model BankImport {
+  id         String       @id @default(cuid())
+  fileName   String
+  owner      FinanceOwner
+  bankLabel  String? // rótulo livre que o usuário dá pro banco/conta, ex: "Nubank PJ"
+  rowCount   Int          @default(0)
+  importedAt DateTime     @default(now())
+
+  salonId String
+  salon   Salon  @relation(fields: [salonId], references: [id], onDelete: Cascade)
+
+  transactions FinanceTransaction[]
+
+  @@index([salonId])
+}
+
+model FinanceTransaction {
+  id            String        @id @default(cuid())
+  date          DateTime
+  description   String
+  amount        Float // sempre positivo — o sinal vem do campo flow
+  flow          FinanceFlow
+  owner         FinanceOwner
+  source        FinanceSource @default(MANUAL)
+  paymentMethod String?
+  counterparty  String? // cliente/fornecedor
+  notes         String?
+  externalId    String? // hash estável da linha (FITID do OFX ou data+descrição+valor do CSV), evita importar a mesma linha duas vezes
+
+  categoryId String?
+  category   FinanceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  importId String?
+  import   BankImport? @relation(fields: [importId], references: [id], onDelete: SetNull)
+
+  salonId String
+  salon   Salon  @relation(fields: [salonId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([salonId, externalId])
+  @@index([salonId, date])
+  @@index([salonId, owner])
 }
