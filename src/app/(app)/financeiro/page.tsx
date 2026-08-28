@@ -7,6 +7,8 @@ import { FinanceiroCharts } from "./FinanceiroCharts";
 import { listCategories } from "@/app/actions/financeiro";
 import { TransactionRow } from "./TransactionRow";
 import { NewTransactionForm } from "./NewTransactionForm";
+import { CashFlowDiagnostics, type CategorySpend } from "./CashFlowDiagnostics";
+import type { FinanceOwner } from "@prisma/client";
 
 const currency = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -68,6 +70,54 @@ export default async function FinanceiroPage() {
   for (const t of monthTransactions) {
     totalsByOwner[t.owner][t.flow === "ENTRADA" ? "entrada" : "saida"] += t.amount;
   }
+
+  // ── Diagnóstico "onde o dinheiro está indo" ────────────────────────────
+  // Saídas por categoria do mês atual, comparadas com o mês anterior pra
+  // sinalizar categorias que dispararam (o "vazamento" que o dono não vê
+  // olhando só o saldo do banco).
+  const prevMonthStart = new Date(Date.UTC(startOfMonth.getUTCFullYear(), startOfMonth.getUTCMonth() - 1, 1));
+  const prevMonthTransactions = await prisma.financeTransaction.findMany({
+    where: { salonId: tenant.salonId, flow: "SAIDA", date: { gte: prevMonthStart, lt: startOfMonth } },
+    include: { category: true },
+  });
+
+  function buildCategorySpend(owner: FinanceOwner): CategorySpend[] {
+    const currentByCategory = new Map<string, number>();
+    monthTransactions
+      .filter((t) => t.owner === owner && t.flow === "SAIDA")
+      .forEach((t) => {
+        const name = t.category?.name ?? "Sem categoria";
+        currentByCategory.set(name, (currentByCategory.get(name) ?? 0) + t.amount);
+      });
+
+    const previousByCategory = new Map<string, number>();
+    prevMonthTransactions
+      .filter((t) => t.owner === owner)
+      .forEach((t) => {
+        const name = t.category?.name ?? "Sem categoria";
+        previousByCategory.set(name, (previousByCategory.get(name) ?? 0) + t.amount);
+      });
+
+    const total = Array.from(currentByCategory.values()).reduce((s, v) => s + v, 0);
+
+    return Array.from(currentByCategory.entries())
+      .map(([name, catTotal]) => {
+        const previousTotal = previousByCategory.get(name) ?? 0;
+        const growthPct = previousTotal > 0 ? ((catTotal - previousTotal) / previousTotal) * 100 : null;
+        const isLeak = previousTotal > 0 && catTotal >= 50 && growthPct !== null && growthPct >= 30;
+        return {
+          name,
+          total: catTotal,
+          pct: total > 0 ? (catTotal / total) * 100 : 0,
+          growthPct,
+          isLeak,
+        };
+      })
+      .sort((a, b) => b.total - a.total);
+  }
+
+  const pjCategorySpend = buildCategorySpend("PJ");
+  const pfCategorySpend = buildCategorySpend("PF");
 
   return (
     <div>
@@ -165,6 +215,8 @@ export default async function FinanceiroPage() {
           </div>
         </Card>
       </div>
+
+      <CashFlowDiagnostics pj={pjCategorySpend} pf={pfCategorySpend} />
 
       <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] gap-6">
         <Card>
