@@ -13,14 +13,16 @@ import {
   setSalonInfo,
   setLogo,
 } from "@/app/actions/config";
+import { listCategories, createCategory, deleteCategory } from "@/app/actions/financeiro";
 
 export default async function ConfiguracoesPage() {
   const tenant = await requireTenant();
 
-  const [salon, professionals, services] = await Promise.all([
+  const [salon, professionals, services, financeCategories] = await Promise.all([
     prisma.salon.findUnique({ where: { id: tenant.salonId } }),
     prisma.professional.findMany({ where: { salonId: tenant.salonId }, orderBy: { name: "asc" } }),
     prisma.service.findMany({ where: { salonId: tenant.salonId }, orderBy: { name: "asc" } }),
+    listCategories(),
   ]);
   if (!salon) return null;
 
@@ -222,6 +224,54 @@ export default async function ConfiguracoesPage() {
             </div>
             <button type="submit" className="w-full bg-navy text-white text-xs font-semibold rounded-lg py-2">
               Adicionar serviço
+            </button>
+          </form>
+        </Card>
+
+        <Card>
+          <div className="text-sm font-semibold text-navy mb-3">💰 Categorias financeiras</div>
+          <p className="text-[11px] text-gray-500 mb-3">
+            Usadas pra classificar os lançamentos do <a href="/financeiro" className="underline">Financeiro</a> e
+            sugerir a categoria certa ao importar um extrato.
+          </p>
+          <div className="space-y-1.5 mb-4 max-h-64 overflow-y-auto">
+            {financeCategories.map((c) => (
+              <div key={c.id} className="flex items-center justify-between text-xs py-1.5 border-b border-gray-50">
+                <div className="min-w-0">
+                  <span className="font-medium text-navy">{c.name}</span>
+                  <span className="text-gray-400">
+                    {" "}— {c.flow === "ENTRADA" ? "Entrada" : "Saída"}
+                    {c.owner ? ` · ${c.owner}` : " · PF e PJ"}
+                  </span>
+                </div>
+                {!c.isSystem && (
+                  <form action={deleteCategory.bind(null, c.id)}>
+                    <button className="text-[10px] font-semibold hover:underline shrink-0" style={{ color: "#C0526E" }}>
+                      Apagar
+                    </button>
+                  </form>
+                )}
+              </div>
+            ))}
+            {financeCategories.length === 0 && (
+              <p className="text-xs text-gray-400 py-2">Nenhuma categoria cadastrada ainda.</p>
+            )}
+          </div>
+          <form action={createCategory} className="space-y-2">
+            <input name="name" required className="input" placeholder="Nome da categoria" />
+            <div className="grid grid-cols-2 gap-2">
+              <select name="flow" className="input">
+                <option value="SAIDA">Saída</option>
+                <option value="ENTRADA">Entrada</option>
+              </select>
+              <select name="owner" className="input">
+                <option value="PJ">Pessoa Jurídica</option>
+                <option value="PF">Pessoa Física</option>
+                <option value="">PF e PJ</option>
+              </select>
+            </div>
+            <button type="submit" className="w-full bg-navy text-white text-xs font-semibold rounded-lg py-2">
+              Adicionar categoria
             </button>
           </form>
         </Card>

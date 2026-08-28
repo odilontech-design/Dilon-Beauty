@@ -1,8 +1,14 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/tenant";
 import { Card, Kpi, StatusBadge } from "@/components/ui";
 import { todayUTCDate, addDaysUTC, startOfMonthUTCDate } from "@/lib/date";
 import { FinanceiroCharts } from "./FinanceiroCharts";
+import { listCategories } from "@/app/actions/financeiro";
+import { TransactionRow } from "./TransactionRow";
+import { NewTransactionForm } from "./NewTransactionForm";
+
+const currency = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 export default async function FinanceiroPage() {
   const tenant = await requireTenant();
@@ -50,6 +56,19 @@ export default async function FinanceiroPage() {
     .map(([name, total]) => ({ name, total }))
     .sort((a, b) => b.total - a.total);
 
+  // ── Controle de caixa PF x PJ (extratos importados + lançamentos manuais) ──
+  const categories = await listCategories();
+  const monthTransactions = await prisma.financeTransaction.findMany({
+    where: { salonId: tenant.salonId, date: { gte: startOfMonth } },
+    include: { category: true },
+    orderBy: { date: "desc" },
+  });
+
+  const totalsByOwner = { PJ: { entrada: 0, saida: 0 }, PF: { entrada: 0, saida: 0 } };
+  for (const t of monthTransactions) {
+    totalsByOwner[t.owner][t.flow === "ENTRADA" ? "entrada" : "saida"] += t.amount;
+  }
+
   return (
     <div>
       <h1 className="font-display font-extrabold text-xl text-navy mb-6">Financeiro</h1>
@@ -96,6 +115,107 @@ export default async function FinanceiroPage() {
         </table>
         </div>
       </Card>
+
+      <div className="flex items-center justify-between mt-10 mb-3">
+        <div>
+          <h2 className="font-display font-extrabold text-lg text-navy">Controle de Caixa · PF x PJ</h2>
+          <p className="text-[11px] text-gray-500 mt-0.5">
+            Separe a conta da empresa (CNPJ) da conta pessoal do dono (CPF) — assim você sabe se o negócio deu lucro real.
+          </p>
+        </div>
+        <Link
+          href="/financeiro/importar"
+          className="text-xs font-semibold text-white bg-navy rounded-lg px-4 py-2.5 shrink-0"
+        >
+          Importar extrato
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <Card>
+          <div className="text-[11px] font-semibold text-teal-600 mb-2">Pessoa Jurídica (CNPJ)</div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="text-[10px] text-gray-400">Entradas no mês</div>
+              <div className="text-sm font-bold text-green-600">{currency(totalsByOwner.PJ.entrada)}</div>
+            </div>
+            <div>
+              <div className="text-[10px] text-gray-400">Saídas no mês</div>
+              <div className="text-sm font-bold text-red-500">{currency(totalsByOwner.PJ.saida)}</div>
+            </div>
+          </div>
+          <div className="mt-2 pt-2 border-t border-gray-100 text-[11px] text-gray-500">
+            Saldo: <strong className="text-navy">{currency(totalsByOwner.PJ.entrada - totalsByOwner.PJ.saida)}</strong>
+          </div>
+        </Card>
+        <Card>
+          <div className="text-[11px] font-semibold text-purple-600 mb-2">Pessoa Física (CPF)</div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="text-[10px] text-gray-400">Entradas no mês</div>
+              <div className="text-sm font-bold text-green-600">{currency(totalsByOwner.PF.entrada)}</div>
+            </div>
+            <div>
+              <div className="text-[10px] text-gray-400">Saídas no mês</div>
+              <div className="text-sm font-bold text-red-500">{currency(totalsByOwner.PF.saida)}</div>
+            </div>
+          </div>
+          <div className="mt-2 pt-2 border-t border-gray-100 text-[11px] text-gray-500">
+            Saldo: <strong className="text-navy">{currency(totalsByOwner.PF.entrada - totalsByOwner.PF.saida)}</strong>
+          </div>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] gap-6">
+        <Card>
+          <div className="text-sm font-semibold text-navy mb-3">Lançamentos do mês</div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs min-w-[560px]">
+              <thead>
+                <tr className="text-left text-gray-400 border-b border-gray-100">
+                  <th className="py-2 font-semibold">Data</th>
+                  <th className="font-semibold">Descrição</th>
+                  <th className="font-semibold">Conta</th>
+                  <th className="font-semibold">Categoria</th>
+                  <th className="font-semibold">Valor</th>
+                  <th className="font-semibold">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {monthTransactions.map((t) => (
+                  <TransactionRow
+                    key={t.id}
+                    categories={categories}
+                    transaction={{
+                      id: t.id,
+                      date: t.date.toISOString(),
+                      description: t.description,
+                      amount: t.amount,
+                      flow: t.flow,
+                      owner: t.owner,
+                      categoryId: t.categoryId,
+                      categoryName: t.category?.name ?? null,
+                      source: t.source,
+                    }}
+                  />
+                ))}
+                {monthTransactions.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="py-6 text-center text-gray-400">
+                      Nenhum lançamento esse mês. Importe um extrato ou lance manualmente.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+
+        <Card>
+          <div className="text-sm font-semibold text-navy mb-3">Lançar manualmente</div>
+          <NewTransactionForm categories={categories} />
+        </Card>
+      </div>
     </div>
   );
 }
