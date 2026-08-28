@@ -11,8 +11,9 @@ export default async function ImportarExtratoPage() {
     <div>
       <h1 className="font-display font-extrabold text-xl text-navy mb-1">Importar Extrato</h1>
       <p className="text-xs text-gray-500 mb-6">
-        Envie o extrato (CSV ou OFX) de qualquer banco. A gente sugere a categoria de cada
-        lançamento — você revisa e confirma antes de salvar.
+        Envie o extrato (CSV, OFX ou PDF) de qualquer banco — inclusive o PDF que o app do
+        Nubank exporta. A gente sugere a categoria de cada lançamento — você revisa e confirma
+        antes de salvar.
       </p>
 
       <Card className="mb-6">
@@ -20,6 +21,9 @@ export default async function ImportarExtratoPage() {
           <strong className="text-navy">Antes de importar:</strong> separe os extratos por conta.
           Um arquivo é sempre de <strong>uma</strong> conta só — Pessoa Jurídica (CNPJ) ou Pessoa
           Física (CPF). Se você movimenta as duas contas, importe uma de cada vez.
+          <br />
+          Em PDF, a leitura é por texto — a formatação varia de banco pra banco, então confira a
+          lista antes de confirmar (você pode desmarcar qualquer linha que não ficou certa).
         </div>
       </Card>
 

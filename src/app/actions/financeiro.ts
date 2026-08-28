@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/tenant";
 import { revalidatePath } from "next/cache";
 import { ensureDefaultCategories } from "@/lib/finance/categories";
-import { parseStatementFile, StatementParseError } from "@/lib/finance/parse";
+import { parseStatementFile, StatementParseError, type ParsedTransaction } from "@/lib/finance/parse";
+import { parseStatementPDF } from "@/lib/finance/parsePdf";
 import { suggestCategory } from "@/lib/finance/classify";
 import type { FinanceFlow, FinanceOwner } from "@prisma/client";
 
@@ -136,18 +137,19 @@ export async function previewStatement(formData: FormData): Promise<PreviewResul
   if (!(file instanceof File)) return { ok: false, error: "Selecione um arquivo de extrato." };
   if (!owner) return { ok: false, error: "Diga se esse extrato é da conta PF ou PJ." };
 
-  let text: string;
-  try {
-    text = await file.text();
-  } catch {
-    return { ok: false, error: "Não conseguimos ler o arquivo enviado." };
-  }
+  const isPDF = file.name.toLowerCase().endsWith(".pdf");
 
-  let parsed;
+  let parsed: ParsedTransaction[];
   try {
-    parsed = parseStatementFile(file.name, text);
+    if (isPDF) {
+      const buffer = new Uint8Array(await file.arrayBuffer());
+      parsed = await parseStatementPDF(buffer);
+    } else {
+      const text = await file.text();
+      parsed = parseStatementFile(file.name, text);
+    }
   } catch (e) {
-    const message = e instanceof StatementParseError ? e.message : "Não conseguimos entender esse arquivo. Confira se é um extrato OFX ou CSV exportado do seu banco.";
+    const message = e instanceof StatementParseError ? e.message : "Não conseguimos entender esse arquivo. Confira se é um extrato OFX, CSV ou PDF exportado do seu banco.";
     return { ok: false, error: message };
   }
 

@@ -246,8 +246,8 @@ export function ImportClient({ categories }: { categories: Category[] }) {
         </div>
 
         <div>
-          <label className="block text-[11px] font-semibold text-gray-500 mb-1">Arquivo do extrato (.csv, .ofx)</label>
-          <input type="file" name="file" accept=".csv,.ofx,.qfx,.txt" required className="input" />
+          <label className="block text-[11px] font-semibold text-gray-500 mb-1">Arquivo do extrato (.csv, .ofx ou .pdf)</label>
+          <input type="file" name="file" accept=".csv,.ofx,.qfx,.txt,.pdf" required className="input" />
         </div>
 
         {error && <div className="text-[11px] text-red-600">{error}</div>}
