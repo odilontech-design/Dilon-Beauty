@@ -226,15 +226,16 @@ export function parseStatementPDFText(rawText: string): ParsedTransaction[] {
 }
 
 export async function parseStatementPDF(data: Uint8Array): Promise<ParsedTransaction[]> {
-  const { PDFParse } = await import("pdf-parse");
-  const parser = new PDFParse({ data });
+  // unpdf empacota uma build do PDF.js feita pra ambiente serverless (sem
+  // depender de canvas nativo) — o pacote "pdf-parse" puxa @napi-rs/canvas,
+  // que não carrega nas funções serverless da Vercel e quebra a extração.
+  const { getDocumentProxy, extractText } = await import("unpdf");
   try {
-    const result = await parser.getText();
-    return parseStatementPDFText(result.text);
+    const pdf = await getDocumentProxy(data);
+    const { text } = await extractText(pdf, { mergePages: true });
+    return parseStatementPDFText(text);
   } catch (e) {
     if (e instanceof StatementParseError) throw e;
     throw new StatementParseError("Não conseguimos ler esse arquivo PDF. Confira se ele não está corrompido ou protegido por senha.");
-  } finally {
-    await parser.destroy();
   }
 }
