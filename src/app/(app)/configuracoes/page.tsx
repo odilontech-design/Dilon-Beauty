@@ -144,14 +144,32 @@ export default async function ConfiguracoesPage() {
               </div>
             )}
             <p className="text-[11px] text-gray-500 flex-1">
-              Cole o link de uma imagem já hospedada (Google Drive, Imgur, seu site etc). Ela aparece no menu do
-              painel e na página pública de agendamento.
+              Envie um arquivo PNG ou cole o link de uma imagem já hospedada. Ela aparece no menu do painel e na
+              página pública de agendamento.
             </p>
           </div>
+
+          <form action={setLogo} className="flex gap-2 mb-2">
+            <input type="hidden" name="mode" value="file" />
+            <input
+              type="file"
+              name="logoFile"
+              accept="image/png"
+              required
+              className="input flex-1"
+            />
+            <button type="submit" className="bg-navy text-white text-xs font-semibold rounded-lg py-2 px-3 whitespace-nowrap">
+              Enviar PNG
+            </button>
+          </form>
+          <p className="text-[10px] text-gray-400 mb-3">Até 2MB.</p>
+
+          <div className="text-[11px] font-semibold text-gray-500 mb-2">ou cole um link</div>
           <form action={setLogo} className="flex gap-2">
+            <input type="hidden" name="mode" value="url" />
             <input
               name="logoUrl"
-              defaultValue={salon.logoUrl ?? ""}
+              defaultValue={salon.logoUrl?.startsWith("data:") ? "" : salon.logoUrl ?? ""}
               className="input flex-1"
               placeholder="https://..."
             />

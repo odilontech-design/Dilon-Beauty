@@ -101,12 +101,32 @@ export async function setSalonInfo(formData: FormData) {
   revalidatePath("/agendar");
 }
 
+const MAX_LOGO_BYTES = 2 * 1024 * 1024; // 2MB
+
 export async function setLogo(formData: FormData) {
   const tenant = await requireTenant();
 
-  const logoUrl = String(formData.get("logoUrl") ?? "").trim();
-  if (logoUrl && !/^https?:\/\//.test(logoUrl)) {
-    throw new Error("Cole um link que comece com http:// ou https://");
+  const mode = String(formData.get("mode") ?? "url");
+  let logoUrl: string;
+
+  if (mode === "file") {
+    const file = formData.get("logoFile");
+    if (!(file instanceof File) || file.size === 0) {
+      throw new Error("Selecione um arquivo PNG.");
+    }
+    if (file.type !== "image/png") {
+      throw new Error("Envie um arquivo PNG.");
+    }
+    if (file.size > MAX_LOGO_BYTES) {
+      throw new Error("O arquivo precisa ter até 2MB.");
+    }
+    const buffer = Buffer.from(await file.arrayBuffer());
+    logoUrl = `data:image/png;base64,${buffer.toString("base64")}`;
+  } else {
+    logoUrl = String(formData.get("logoUrl") ?? "").trim();
+    if (logoUrl && !/^https?:\/\//.test(logoUrl)) {
+      throw new Error("Cole um link que comece com http:// ou https://");
+    }
   }
 
   await prisma.salon.update({
