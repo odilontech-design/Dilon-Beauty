@@ -9,12 +9,16 @@ import { TransactionRow } from "./TransactionRow";
 import { NewTransactionModal } from "./NewTransactionModal";
 import { MonthFilter } from "./MonthFilter";
 import { CashFlowDiagnostics, type CategorySpend } from "./CashFlowDiagnostics";
+import { Dre } from "./Dre";
+import { Disponibilidade, type Compromisso } from "./Disponibilidade";
+import { MetodoSemanal } from "./MetodoSemanal";
 import {
   competenciaToDateRange,
   formatCompetencia,
   isCompetencia,
   shiftCompetencia,
 } from "@/lib/finance/competencia";
+import { calcularDre, calcularDisponibilidade, montarPassosSemanais } from "@/lib/finance/analise";
 import type { FinanceOwner } from "@prisma/client";
 
 const currency = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -37,7 +41,8 @@ export default async function FinanceiroPage({
   const startOfDay = todayUTCDate();
   const endOfDay = addDaysUTC(startOfDay, 1);
 
-  const [monthAppts, todayAppts, categories, competencias] = await Promise.all([
+  const [salon, monthAppts, todayAppts, categories, competencias] = await Promise.all([
+    prisma.salon.findUnique({ where: { id: tenant.salonId }, select: { metaCaixa: true } }),
     prisma.appointment.findMany({
       where: {
         salonId: tenant.salonId,
@@ -91,20 +96,41 @@ export default async function FinanceiroPage({
     .sort((a, b) => b.total - a.total);
 
   // ── Caixa PF x PJ, por competência ────────────────────────────────────────
-  const [monthTransactions, prevMonthTransactions] = await Promise.all([
-    prisma.financeTransaction.findMany({
-      where: { salonId: tenant.salonId, competencia },
-      include: { category: true, import: { select: { bankLabel: true, fileName: true } } },
-      orderBy: { date: "desc" },
-    }),
-    prisma.financeTransaction.findMany({
-      where: { salonId: tenant.salonId, competencia: competenciaAnterior, flow: "SAIDA" },
-      include: { category: true },
-    }),
-  ]);
+  const em30Dias = addDaysUTC(startOfDay, 30);
+  const seteDiasAtras = addDaysUTC(startOfDay, -7);
 
+  const [monthTransactions, prevMonthTransactions, historicoPago, pendentes, importRecente] =
+    await Promise.all([
+      prisma.financeTransaction.findMany({
+        where: { salonId: tenant.salonId, competencia },
+        include: { category: true, import: { select: { bankLabel: true, fileName: true } } },
+        orderBy: { date: "desc" },
+      }),
+      prisma.financeTransaction.findMany({
+        where: { salonId: tenant.salonId, competencia: competenciaAnterior, flow: "SAIDA", status: "PAGO" },
+        include: { category: true },
+      }),
+      // Saldo não zera na virada do mês: vem do histórico inteiro da empresa.
+      prisma.financeTransaction.findMany({
+        where: { salonId: tenant.salonId, owner: "PJ", status: "PAGO" },
+        select: { amount: true, flow: true },
+      }),
+      prisma.financeTransaction.findMany({
+        where: { salonId: tenant.salonId, status: "PENDENTE" },
+        select: { id: true, description: true, amount: true, flow: true, owner: true, dueDate: true },
+        orderBy: { dueDate: "asc" },
+      }),
+      prisma.bankImport.findFirst({
+        where: { salonId: tenant.salonId, importedAt: { gte: seteDiasAtras } },
+        select: { id: true },
+      }),
+    ]);
+
+  // Totais do mês contam só o que já passou pelo banco — compromisso que ainda
+  // vai vencer não é entrada nem saída, é compromisso.
+  const pagosDoMes = monthTransactions.filter((t) => t.status === "PAGO");
   const totalsByOwner = { PJ: { entrada: 0, saida: 0 }, PF: { entrada: 0, saida: 0 } };
-  for (const t of monthTransactions) {
+  for (const t of pagosDoMes) {
     totalsByOwner[t.owner][t.flow === "ENTRADA" ? "entrada" : "saida"] += t.amount;
   }
 
@@ -112,13 +138,41 @@ export default async function FinanceiroPage({
   const saidasTotal = totalsByOwner.PJ.saida + totalsByOwner.PF.saida;
   const semCategoria = monthTransactions.filter((t) => !t.categoryId).length;
 
+  const dre = calcularDre(
+    monthTransactions.map((t) => ({
+      amount: t.amount,
+      flow: t.flow,
+      owner: t.owner,
+      status: t.status,
+      dueDate: t.dueDate,
+      categoryKind: t.category?.kind ?? null,
+    }))
+  );
+
+  const disponibilidade = calcularDisponibilidade(
+    historicoPago,
+    pendentes.filter((p) => p.owner === "PJ")
+  );
+
+  const compromissos: Compromisso[] = pendentes
+    .filter((p) => p.dueDate && p.dueDate < em30Dias)
+    .map((p) => ({
+      id: p.id,
+      description: p.description,
+      amount: p.amount,
+      flow: p.flow,
+      owner: p.owner,
+      dueDate: p.dueDate!.toISOString(),
+      diasRestantes: Math.round((p.dueDate!.getTime() - startOfDay.getTime()) / 86400000),
+    }));
+
   // ── Diagnóstico "onde o dinheiro está indo" ───────────────────────────────
   // Saídas por categoria comparadas com a competência anterior, pra sinalizar
   // categorias que dispararam — o "vazamento" que não aparece olhando só o
   // saldo do banco.
   function buildCategorySpend(owner: FinanceOwner): CategorySpend[] {
     const atual = new Map<string, number>();
-    monthTransactions
+    pagosDoMes
       .filter((t) => t.owner === owner && t.flow === "SAIDA")
       .forEach((t) => {
         const name = t.category?.name ?? "Sem categoria";
@@ -153,6 +207,18 @@ export default async function FinanceiroPage({
   const pjCategorySpend = buildCategorySpend("PJ");
   const pfCategorySpend = buildCategorySpend("PF");
 
+  const vazamento = pjCategorySpend.find((c) => c.isLeak) ?? pfCategorySpend.find((c) => c.isLeak);
+  const passosSemanais = montarPassosSemanais({
+    lancamentosNaCompetencia: monthTransactions.length,
+    importouRecentemente: !!importRecente,
+    semCategoria,
+    temVazamento: !!vazamento,
+    nomeVazamento: vazamento?.name ?? null,
+    compromissos30Dias: compromissos.length,
+    metaCaixa: salon?.metaCaixa ?? null,
+    disponivel: disponibilidade.disponivel,
+  });
+
   return (
     <div>
       <div className="flex flex-wrap items-start justify-between gap-3 mb-1">
@@ -183,12 +249,23 @@ export default async function FinanceiroPage({
           value={currency(monthRevenue)}
           sub={`${monthAppts.length} concluídos · ticket ${currency(avgTicket)}`}
         />
-        <Kpi label="Entradas no caixa" value={currency(entradasTotal)} sub="PJ + PF, extrato e manual" />
-        <Kpi label="Saídas no caixa" value={currency(saidasTotal)} sub="PJ + PF, extrato e manual" />
+        <Kpi label="Entradas no caixa" value={currency(entradasTotal)} sub="PJ + PF, só o que já entrou" />
+        <Kpi label="Saídas no caixa" value={currency(saidasTotal)} sub="PJ + PF, só o que já saiu" />
         <Kpi
           label="Resultado do mês"
           value={currency(entradasTotal - saidasTotal)}
           sub={entradasTotal - saidasTotal >= 0 ? "sobrou" : "faltou"}
+        />
+      </div>
+
+      <MetodoSemanal passos={passosSemanais} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <Dre dre={dre} periodo={formatCompetencia(competencia)} />
+        <Disponibilidade
+          dados={disponibilidade}
+          compromissos={compromissos}
+          metaCaixa={salon?.metaCaixa ?? null}
         />
       </div>
 
@@ -266,6 +343,8 @@ export default async function FinanceiroPage({
                     amount: t.amount,
                     flow: t.flow,
                     owner: t.owner,
+                    status: t.status,
+                    dueDate: t.dueDate ? t.dueDate.toISOString() : null,
                     categoryId: t.categoryId,
                     categoryName: t.category?.name ?? null,
                     source: t.source,

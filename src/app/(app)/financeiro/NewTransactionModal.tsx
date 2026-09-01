@@ -47,6 +47,7 @@ function NewTransactionForm({
   // mexe, para de acompanhar — senão trocar a data desfaria a correção dele.
   const [competencia, setCompetencia] = useState(competenciaFromDate(hoje));
   const [competenciaTravada, setCompetenciaTravada] = useState(false);
+  const [status, setStatus] = useState<"PAGO" | "PENDENTE">("PAGO");
   const [saving, setSaving] = useState(false);
   const [erro, setErro] = useState("");
 
@@ -120,8 +121,34 @@ function NewTransactionForm({
         <input type="hidden" name="owner" value={owner} />
       </Campo>
 
+      <Campo label="Situação">
+        <div className="grid grid-cols-2 gap-2">
+          <BotaoConta
+            ativo={status === "PAGO"}
+            onClick={() => setStatus("PAGO")}
+            titulo={flow === "ENTRADA" ? "Já recebi" : "Já paguei"}
+            sub="entra no resultado"
+            cor="#00A878"
+          />
+          <BotaoConta
+            ativo={status === "PENDENTE"}
+            onClick={() => setStatus("PENDENTE")}
+            titulo={flow === "ENTRADA" ? "Vou receber" : "Ainda vou pagar"}
+            sub="vira compromisso"
+            cor="#E0930A"
+          />
+        </div>
+        <input type="hidden" name="status" value={status} />
+      </Campo>
+
+      {status === "PENDENTE" && (
+        <Campo label="Vence em">
+          <input type="date" name="dueDate" required defaultValue={date} className="input" />
+        </Campo>
+      )}
+
       <div className="grid grid-cols-2 gap-2">
-        <Campo label="Data do pagamento">
+        <Campo label={status === "PENDENTE" ? "Data do lançamento" : "Data do pagamento"}>
           <input
             type="date"
             name="date"
@@ -173,8 +200,17 @@ function NewTransactionForm({
         </select>
       </Campo>
 
-      <Campo label="Cliente / Fornecedor (opcional)">
-        <input name="counterparty" className="input" placeholder="Ex: Distribuidora Beleza" />
+      <div className="grid grid-cols-2 gap-2">
+        <Campo label="Cliente / Fornecedor">
+          <input name="counterparty" className="input" placeholder="Opcional" />
+        </Campo>
+        <Campo label="Forma de pagamento">
+          <input name="paymentMethod" className="input" placeholder="Pix, cartão, dinheiro..." />
+        </Campo>
+      </div>
+
+      <Campo label="Observações">
+        <input name="notes" className="input" placeholder="Opcional" />
       </Campo>
 
       {erro && <p className="text-xs text-red-500">{erro}</p>}

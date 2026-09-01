@@ -48,6 +48,26 @@ enum FinanceSource {
   IMPORTACAO
 }
 
+// Natureza do gasto, pra montar o lucro real e separar o que é custo do negócio
+// do que é retirada do dono. RETIRADA fica de fora do custo de propósito:
+// pró-labore não é despesa operacional, é distribuição do lucro — tratá-lo como
+// custo faz o negócio parecer menos lucrativo do que é.
+enum FinanceCategoryKind {
+  RECEITA
+  FIXA // sai todo mês mesmo sem vender: aluguel, internet, salário
+  VARIAVEL // acompanha o movimento: mercadoria, comissão, marketing
+  IMPOSTO
+  DIVIDA
+  RETIRADA
+}
+
+// PAGO = já passou pelo banco. PENDENTE = compromisso assumido que ainda vai
+// vencer — é o que separa "saldo" de "dinheiro livre".
+enum FinanceStatus {
+  PAGO
+  PENDENTE
+}
+
 // ─── TENANT ────────────────────────────────────────────────────────────────
 model Salon {
   id        String   @id @default(cuid())
@@ -61,6 +81,7 @@ model Salon {
   logoUrl   String? // link de uma imagem já hospedada (ex: Google Drive, Imgur) — sem upload de arquivo por enquanto
   active      Boolean   @default(true) // desativado pelo admin = login e link público de agendamento bloqueados
   trialEndsAt DateTime? // só informativo — acompanhamento é manual, não bloqueia acesso sozinho
+  metaCaixa   Float? // meta de reserva de caixa do passo 6 do método dos 30 minutos
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -162,12 +183,13 @@ model Appointment {
 // pra um lado só (ex: "Pró-labore Recebido" só existe do lado PF); owner nulo
 // = serve pros dois (ex: "Transferência entre contas").
 model FinanceCategory {
-  id       String       @id @default(cuid())
+  id       String              @id @default(cuid())
   name     String
   flow     FinanceFlow
   owner    FinanceOwner?
+  kind     FinanceCategoryKind @default(VARIAVEL)
   keywords String? // termos separados por vírgula usados na sugestão automática ao importar extrato
-  isSystem Boolean      @default(false) // categoria padrão criada automaticamente, não pode ser apagada
+  isSystem Boolean             @default(false) // categoria padrão criada automaticamente, não pode ser apagada
 
   salonId String
   salon   Salon  @relation(fields: [salonId], references: [id], onDelete: Cascade)
@@ -209,6 +231,8 @@ model FinanceTransaction {
   amount        Float // sempre positivo — o sinal vem do campo flow
   flow          FinanceFlow
   owner         FinanceOwner
+  status        FinanceStatus @default(PAGO)
+  dueDate       DateTime? // vencimento, quando o lançamento ainda está PENDENTE
   source        FinanceSource @default(MANUAL)
   paymentMethod String?
   counterparty  String? // cliente/fornecedor
@@ -230,4 +254,5 @@ model FinanceTransaction {
   @@index([salonId, date])
   @@index([salonId, owner])
   @@index([salonId, competencia])
+  @@index([salonId, status, dueDate])
 }

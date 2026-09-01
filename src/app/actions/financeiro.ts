@@ -8,7 +8,8 @@ import { parseStatementFile, StatementParseError, type ParsedTransaction } from 
 import { parseStatementPDF } from "@/lib/finance/parsePdf";
 import { suggestCategory } from "@/lib/finance/classify";
 import { competenciaFromDate, isCompetencia } from "@/lib/finance/competencia";
-import type { FinanceFlow, FinanceOwner } from "@prisma/client";
+import { todayDateStrInSalonTZ } from "@/lib/date";
+import type { FinanceCategoryKind, FinanceFlow, FinanceOwner, FinanceStatus } from "@prisma/client";
 
 // ─── Categorias ──────────────────────────────────────────────────────────
 export async function listCategories() {
@@ -27,15 +28,36 @@ export async function createCategory(formData: FormData) {
   const flow = String(formData.get("flow") ?? "") as FinanceFlow;
   const ownerRaw = String(formData.get("owner") ?? "");
   const owner = ownerRaw === "PF" || ownerRaw === "PJ" ? (ownerRaw as FinanceOwner) : null;
+  const kindRaw = String(formData.get("kind") ?? "");
 
   if (!name) throw new Error("Nome da categoria é obrigatório.");
   if (flow !== "ENTRADA" && flow !== "SAIDA") throw new Error("Tipo de categoria inválido.");
 
+  const kind: FinanceCategoryKind =
+    flow === "ENTRADA"
+      ? "RECEITA"
+      : (["FIXA", "VARIAVEL", "IMPOSTO", "DIVIDA", "RETIRADA"] as const).includes(kindRaw as never)
+        ? (kindRaw as FinanceCategoryKind)
+        : "VARIAVEL";
+
   await prisma.financeCategory.create({
-    data: { salonId: tenant.salonId, name, flow, owner, keywords: "" },
+    data: { salonId: tenant.salonId, name, flow, owner, kind, keywords: "" },
   });
 
   revalidatePath("/financeiro");
+  revalidatePath("/configuracoes");
+}
+
+export async function setCategoryKind(id: string, kind: FinanceCategoryKind) {
+  const tenant = await requireTenant();
+
+  await prisma.financeCategory.updateMany({
+    where: { id, salonId: tenant.salonId },
+    data: { kind },
+  });
+
+  revalidatePath("/financeiro");
+  revalidatePath("/configuracoes");
 }
 
 export async function deleteCategory(id: string) {
@@ -63,6 +85,8 @@ export async function createTransaction(formData: FormData) {
   const counterparty = String(formData.get("counterparty") ?? "").trim() || null;
   const notes = String(formData.get("notes") ?? "").trim() || null;
   const competenciaRaw = String(formData.get("competencia") ?? "").trim();
+  const statusRaw = String(formData.get("status") ?? "PAGO");
+  const dueDateRaw = String(formData.get("dueDate") ?? "").trim();
 
   if (!description) throw new Error("Descrição é obrigatória.");
   if (!dateRaw) throw new Error("Data é obrigatória.");
@@ -76,6 +100,12 @@ export async function createTransaction(formData: FormData) {
   const competencia = competenciaRaw || competenciaFromDate(dateRaw);
   if (!isCompetencia(competencia)) throw new Error("Competência inválida.");
 
+  const status: FinanceStatus = statusRaw === "PENDENTE" ? "PENDENTE" : "PAGO";
+  // Vencimento só faz sentido em conta que ainda não foi paga; se veio em
+  // branco, o próprio dia do lançamento serve de vencimento.
+  const dueDate =
+    status === "PENDENTE" ? new Date(`${dueDateRaw || dateRaw}T00:00:00.000Z`) : null;
+
   await prisma.financeTransaction.create({
     data: {
       salonId: tenant.salonId,
@@ -85,12 +115,42 @@ export async function createTransaction(formData: FormData) {
       amount,
       flow,
       owner,
+      status,
+      dueDate,
       categoryId,
       paymentMethod,
       counterparty,
       notes,
       source: "MANUAL",
     },
+  });
+
+  revalidatePath("/financeiro");
+}
+
+/** Baixa de uma conta pendente: vira PAGO e a data do pagamento passa a ser hoje. */
+export async function marcarComoPago(id: string) {
+  const tenant = await requireTenant();
+
+  const hoje = new Date(`${todayDateStrInSalonTZ()}T00:00:00.000Z`);
+  await prisma.financeTransaction.updateMany({
+    where: { id, salonId: tenant.salonId },
+    data: { status: "PAGO", date: hoje, dueDate: null },
+  });
+
+  revalidatePath("/financeiro");
+}
+
+export async function setMetaCaixa(formData: FormData) {
+  const tenant = await requireTenant();
+
+  const raw = String(formData.get("metaCaixa") ?? "").replace(/\./g, "").replace(",", ".").trim();
+  const valor = raw === "" ? null : Math.abs(Number(raw));
+  if (valor !== null && Number.isNaN(valor)) throw new Error("Valor de meta inválido.");
+
+  await prisma.salon.update({
+    where: { id: tenant.salonId },
+    data: { metaCaixa: valor },
   });
 
   revalidatePath("/financeiro");

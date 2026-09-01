@@ -14,6 +14,7 @@ import {
   setLogo,
 } from "@/app/actions/config";
 import { listCategories, createCategory, deleteCategory } from "@/app/actions/financeiro";
+import { CategoryKindSelect } from "./CategoryKindSelect";
 
 export default async function ConfiguracoesPage() {
   const tenant = await requireTenant();
@@ -250,25 +251,29 @@ export default async function ConfiguracoesPage() {
           <div className="text-sm font-semibold text-navy mb-3">💰 Categorias financeiras</div>
           <p className="text-[11px] text-gray-500 mb-3">
             Usadas pra classificar os lançamentos do <a href="/financeiro" className="underline">Financeiro</a> e
-            sugerir a categoria certa ao importar um extrato.
+            sugerir a categoria certa ao importar um extrato. O tipo (fixa, variável, imposto…) é o que monta o
+            cálculo de lucro real.
           </p>
-          <div className="space-y-1.5 mb-4 max-h-64 overflow-y-auto">
+          <div className="space-y-1.5 mb-4 max-h-72 overflow-y-auto">
             {financeCategories.map((c) => (
-              <div key={c.id} className="flex items-center justify-between text-xs py-1.5 border-b border-gray-50">
+              <div key={c.id} className="flex items-center justify-between gap-2 text-xs py-1.5 border-b border-gray-50">
                 <div className="min-w-0">
-                  <span className="font-medium text-navy">{c.name}</span>
-                  <span className="text-gray-400">
-                    {" "}— {c.flow === "ENTRADA" ? "Entrada" : "Saída"}
+                  <div className="font-medium text-navy truncate">{c.name}</div>
+                  <div className="text-[10px] text-gray-400">
+                    {c.flow === "ENTRADA" ? "Entrada" : "Saída"}
                     {c.owner ? ` · ${c.owner}` : " · PF e PJ"}
-                  </span>
+                  </div>
                 </div>
-                {!c.isSystem && (
-                  <form action={deleteCategory.bind(null, c.id)}>
-                    <button className="text-[10px] font-semibold hover:underline shrink-0" style={{ color: "#C0526E" }}>
-                      Apagar
-                    </button>
-                  </form>
-                )}
+                <div className="flex items-center gap-2 shrink-0">
+                  {c.flow === "SAIDA" && <CategoryKindSelect id={c.id} kind={c.kind} />}
+                  {!c.isSystem && (
+                    <form action={deleteCategory.bind(null, c.id)}>
+                      <button className="text-[10px] font-semibold hover:underline" style={{ color: "#C0526E" }}>
+                        Apagar
+                      </button>
+                    </form>
+                  )}
+                </div>
               </div>
             ))}
             {financeCategories.length === 0 && (
@@ -288,6 +293,13 @@ export default async function ConfiguracoesPage() {
                 <option value="">PF e PJ</option>
               </select>
             </div>
+            <select name="kind" className="input" defaultValue="VARIAVEL">
+              <option value="VARIAVEL">Despesa variável (acompanha o movimento)</option>
+              <option value="FIXA">Despesa fixa (sai todo mês)</option>
+              <option value="IMPOSTO">Imposto</option>
+              <option value="DIVIDA">Dívida ou juros</option>
+              <option value="RETIRADA">Retirada do dono / pró-labore</option>
+            </select>
             <button type="submit" className="w-full bg-navy text-white text-xs font-semibold rounded-lg py-2">
               Adicionar categoria
             </button>

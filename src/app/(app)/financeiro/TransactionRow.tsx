@@ -14,6 +14,8 @@ type Transaction = {
   amount: number;
   flow: "ENTRADA" | "SAIDA";
   owner: "PF" | "PJ";
+  status: "PAGO" | "PENDENTE";
+  dueDate: string | null;
   categoryId: string | null;
   categoryName: string | null;
   source: "MANUAL" | "IMPORTACAO";
@@ -99,7 +101,21 @@ export function TransactionRow({ transaction, categories }: { transaction: Trans
         </span>
       </td>
       <td className="max-w-[220px]">
-        <div className="truncate" title={transaction.description}>{transaction.description}</div>
+        <div className="flex items-center gap-1.5">
+          <span className="truncate" title={transaction.description}>{transaction.description}</span>
+          {transaction.status === "PENDENTE" && (
+            <span
+              className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 shrink-0"
+              title={
+                transaction.dueDate
+                  ? `Vence em ${formatDate(transaction.dueDate)}`
+                  : "Ainda não passou pelo banco"
+              }
+            >
+              a pagar
+            </span>
+          )}
+        </div>
         {transaction.origem && (
           <div className="text-[10px] text-gray-400 truncate" title={`Importado de ${transaction.origem}`}>
             {transaction.origem}
