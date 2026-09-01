@@ -10,16 +10,20 @@ const currency = (v: number) => v.toLocaleString("pt-BR", { style: "currency", c
 export function FinanceiroCharts({
   dailyRevenue,
   revenueByService,
+  periodo,
 }: {
   dailyRevenue: { day: string; total: number }[];
   revenueByService: { name: string; total: number }[];
+  periodo: string;
 }) {
   const hasServiceData = revenueByService.length > 0;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
       <Card>
-        <div className="text-sm font-semibold text-navy mb-3">Receita por dia (mês atual)</div>
+        <div className="text-sm font-semibold text-navy mb-3">
+          Receita por dia · <span className="capitalize font-normal text-gray-500">{periodo}</span>
+        </div>
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={dailyRevenue} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
             <CartesianGrid vertical={false} stroke="#F1F5F9" />
@@ -41,7 +45,9 @@ export function FinanceiroCharts({
       </Card>
 
       <Card>
-        <div className="text-sm font-semibold text-navy mb-3">Receita por serviço (mês atual)</div>
+        <div className="text-sm font-semibold text-navy mb-3">
+          Receita por serviço · <span className="capitalize font-normal text-gray-500">{periodo}</span>
+        </div>
         {hasServiceData ? (
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>

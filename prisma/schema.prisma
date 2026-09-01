@@ -199,7 +199,12 @@ model BankImport {
 
 model FinanceTransaction {
   id            String        @id @default(cuid())
-  date          DateTime
+  date          DateTime // data em que o dinheiro entrou/saiu de fato (regime de caixa)
+  // Mês de referência no formato "YYYY-MM" (regime de competência). Nasce igual
+  // ao mês de `date`, mas pode ser corrigido: a conta de luz paga dia 05/10 que
+  // se refere ao consumo de setembro tem competência "2026-09". É por ela que a
+  // análise mensal filtra — senão o gasto aparece no mês errado.
+  competencia   String
   description   String
   amount        Float // sempre positivo — o sinal vem do campo flow
   flow          FinanceFlow
@@ -224,4 +229,5 @@ model FinanceTransaction {
   @@unique([salonId, externalId])
   @@index([salonId, date])
   @@index([salonId, owner])
+  @@index([salonId, competencia])
 }

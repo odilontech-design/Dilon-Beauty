@@ -7,6 +7,7 @@ import { ensureDefaultCategories } from "@/lib/finance/categories";
 import { parseStatementFile, StatementParseError, type ParsedTransaction } from "@/lib/finance/parse";
 import { parseStatementPDF } from "@/lib/finance/parsePdf";
 import { suggestCategory } from "@/lib/finance/classify";
+import { competenciaFromDate, isCompetencia } from "@/lib/finance/competencia";
 import type { FinanceFlow, FinanceOwner } from "@prisma/client";
 
 // ─── Categorias ──────────────────────────────────────────────────────────
@@ -60,6 +61,8 @@ export async function createTransaction(formData: FormData) {
   const categoryId = String(formData.get("categoryId") ?? "") || null;
   const paymentMethod = String(formData.get("paymentMethod") ?? "").trim() || null;
   const counterparty = String(formData.get("counterparty") ?? "").trim() || null;
+  const notes = String(formData.get("notes") ?? "").trim() || null;
+  const competenciaRaw = String(formData.get("competencia") ?? "").trim();
 
   if (!description) throw new Error("Descrição é obrigatória.");
   if (!dateRaw) throw new Error("Data é obrigatória.");
@@ -69,10 +72,15 @@ export async function createTransaction(formData: FormData) {
   const amount = Math.abs(Number(amountRaw));
   if (!amount || Number.isNaN(amount)) throw new Error("Valor inválido.");
 
+  // Em branco = mesma coisa que o mês do pagamento, que é o caso normal.
+  const competencia = competenciaRaw || competenciaFromDate(dateRaw);
+  if (!isCompetencia(competencia)) throw new Error("Competência inválida.");
+
   await prisma.financeTransaction.create({
     data: {
       salonId: tenant.salonId,
       date: new Date(`${dateRaw}T00:00:00.000Z`),
+      competencia,
       description,
       amount,
       flow,
@@ -80,6 +88,7 @@ export async function createTransaction(formData: FormData) {
       categoryId,
       paymentMethod,
       counterparty,
+      notes,
       source: "MANUAL",
     },
   });
@@ -93,16 +102,38 @@ export async function updateTransaction(id: string, formData: FormData) {
   const categoryId = String(formData.get("categoryId") ?? "") || null;
   const owner = String(formData.get("owner") ?? "") as FinanceOwner;
   const description = String(formData.get("description") ?? "").trim();
+  const competencia = String(formData.get("competencia") ?? "").trim();
 
   if (owner !== "PF" && owner !== "PJ") throw new Error("É preciso dizer se é PF ou PJ.");
   if (!description) throw new Error("Descrição é obrigatória.");
+  if (competencia && !isCompetencia(competencia)) throw new Error("Competência inválida.");
 
   await prisma.financeTransaction.updateMany({
     where: { id, salonId: tenant.salonId },
-    data: { categoryId, owner, description },
+    data: { categoryId, owner, description, ...(competencia ? { competencia } : {}) },
   });
 
   revalidatePath("/financeiro");
+}
+
+/**
+ * Meses que já têm lançamento, do mais recente pro mais antigo — alimenta o
+ * seletor de competência. Sempre inclui o mês corrente, mesmo vazio, pra que
+ * a tela abra em algum lugar quando ainda não há nada lançado.
+ */
+export async function listCompetencias(currentCompetencia: string): Promise<string[]> {
+  const tenant = await requireTenant();
+
+  const rows = await prisma.financeTransaction.groupBy({
+    by: ["competencia"],
+    where: { salonId: tenant.salonId },
+    orderBy: { competencia: "desc" },
+  });
+
+  const meses = new Set(rows.map((r) => r.competencia).filter(isCompetencia));
+  meses.add(currentCompetencia);
+
+  return Array.from(meses).sort((a, b) => b.localeCompare(a));
 }
 
 export async function deleteTransaction(id: string) {
@@ -215,6 +246,10 @@ export async function confirmImport(input: ConfirmImportInput) {
       salonId: tenant.salonId,
       importId: bankImport.id,
       date: new Date(r.date),
+      // Extrato traz a data em que o dinheiro se moveu; a competência começa
+      // igual e o dono ajusta depois nos casos em que o mês de referência
+      // é outro (aluguel do mês passado pago agora, por exemplo).
+      competencia: competenciaFromDate(new Date(r.date)),
       description: r.description,
       amount: r.amount,
       flow: r.flow,
