@@ -10,7 +10,8 @@
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "hash-admin": "node scripts/gerar-hash-admin.js"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

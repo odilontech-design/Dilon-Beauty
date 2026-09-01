@@ -10,14 +10,47 @@ import { createAdminSession, destroyAdminSession, requireAdmin } from "@/lib/adm
 
 export type AdminLoginState = { ok: boolean; error?: string };
 
+/**
+ * Compara dois segredos sem vazar informação pelo TEMPO da comparação.
+ *
+ * O `!==` de string para na primeira letra diferente, então uma senha que
+ * acerta o começo demora um tiquinho mais que uma que erra de cara. Medindo
+ * isso muitas vezes dá pra descobrir a senha letra por letra.
+ *
+ * Os dois passam por SHA-256 antes porque timingSafeEqual exige buffers do
+ * mesmo tamanho — e comparar o tamanho antes vazaria justamente o que se quer
+ * esconder. Com o hash, a comparação sempre roda sobre 32 bytes.
+ */
+function conferirEmTempoConstante(digitada: string, esperada: string): boolean {
+  const a = crypto.createHash("sha256").update(digitada, "utf8").digest();
+  const b = crypto.createHash("sha256").update(esperada, "utf8").digest();
+  return crypto.timingSafeEqual(a, b);
+}
+
 export async function adminLogin(_prev: AdminLoginState, formData: FormData): Promise<AdminLoginState> {
   const password = String(formData.get("password") ?? "");
-  const expected = process.env.ADMIN_PASSWORD;
+  const hash = process.env.ADMIN_PASSWORD_HASH;
+  const emTextoPuro = process.env.ADMIN_PASSWORD;
 
-  if (!expected) {
-    return { ok: false, error: "ADMIN_PASSWORD não configurado no servidor." };
+  if (!hash && !emTextoPuro) {
+    return { ok: false, error: "Acesso administrativo não configurado no servidor." };
   }
-  if (password !== expected) {
+
+  // Prefere o hash. O texto puro continua funcionando pra instalação que
+  // ainda não migrou: trocar isso de uma vez derrubaria o painel em produção
+  // no instante do deploy, antes de alguém ter chance de configurar o hash.
+  let confere: boolean;
+  if (hash) {
+    confere = await bcrypt.compare(password, hash);
+  } else {
+    console.warn(
+      "[admin] ADMIN_PASSWORD em texto puro. Gere um hash com `npm run hash-admin` " +
+        "e configure ADMIN_PASSWORD_HASH; depois remova ADMIN_PASSWORD."
+    );
+    confere = conferirEmTempoConstante(password, emTextoPuro!);
+  }
+
+  if (!confere) {
     return { ok: false, error: "Senha incorreta." };
   }
 
