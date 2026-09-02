@@ -10,6 +10,8 @@ const NAV = [
   { href: "/agenda", icon: "📅", label: "Agenda" },
   { href: "/clientes", icon: "◉", label: "Clientes" },
   { href: "/financeiro", icon: "◐", label: "Financeiro" },
+  { href: "/comissoes", icon: "🤝", label: "Comissões" },
+  { href: "/estoque", icon: "📦", label: "Estoque" },
   { href: "/configuracoes", icon: "⚙️", label: "Configurações" },
 ];
 

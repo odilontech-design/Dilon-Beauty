@@ -94,6 +94,8 @@ model Salon {
   financeCategories    FinanceCategory[]
   bankImports          BankImport[]
   financeTransactions  FinanceTransaction[]
+  products             Product[]
+  stockMovements       StockMovement[]
 }
 
 // ─── AUTH ──────────────────────────────────────────────────────────────────
@@ -117,6 +119,9 @@ model Professional {
   name   String
   role   String? // ex: "Cabeleireira", "Manicure"
   active Boolean @default(true)
+  // Percentual padrão de comissão sobre o serviço. Um serviço pode ter
+  // percentual próprio (Service.commissionPct) que ganha deste aqui.
+  commissionPct Float @default(0)
 
   salonId String
   salon   Salon  @relation(fields: [salonId], references: [id], onDelete: Cascade)
@@ -132,6 +137,10 @@ model Service {
   price       Float
   durationMin Int     @default(60)
   active      Boolean @default(true)
+  // Sobrepõe o percentual do profissional quando preenchido — serve pro caso
+  // comum de pagar menos em serviço onde o salão banca o produto (coloração)
+  // do que em serviço de mão de obra pura (corte).
+  commissionPct Float?
 
   salonId String
   salon   Salon  @relation(fields: [salonId], references: [id], onDelete: Cascade)
@@ -161,6 +170,11 @@ model Appointment {
   time   String // "14:30" — mantido como string simples para exibição direta
   status AppointmentStatus @default(AGUARDANDO)
   price  Float
+  // Congelado quando o atendimento é concluído, igual ao price: se o salão
+  // mudar o percentual depois, o que já foi feito continua valendo o combinado
+  // da época.
+  commissionAmount Float   @default(0)
+  commissionPaid   Boolean @default(false)
 
   salonId String
   salon   Salon  @relation(fields: [salonId], references: [id], onDelete: Cascade)
@@ -255,4 +269,49 @@ model FinanceTransaction {
   @@index([salonId, owner])
   @@index([salonId, competencia])
   @@index([salonId, status, dueDate])
+}
+
+// ─── ESTOQUE ───────────────────────────────────────────────────────────────
+enum StockMovementType {
+  ENTRADA // compra/reposição
+  SAIDA // uso no atendimento ou venda
+  AJUSTE // correção de contagem física
+}
+
+model Product {
+  id          String  @id @default(cuid())
+  name        String
+  unit        String  @default("un") // un, ml, g, kg, cx...
+  quantity    Float   @default(0) // saldo atual, recalculado a cada movimento
+  minQuantity Float   @default(0) // abaixo disso o produto entra no alerta de reposição
+  costPrice   Float   @default(0)
+  active      Boolean @default(true)
+
+  salonId String
+  salon   Salon  @relation(fields: [salonId], references: [id], onDelete: Cascade)
+
+  movements StockMovement[]
+
+  @@index([salonId])
+}
+
+// Cada entrada/saída fica registrada: o saldo do produto é a soma dos
+// movimentos, não um número editado à mão. É o que permite descobrir depois
+// pra onde foi o produto que sumiu.
+model StockMovement {
+  id        String            @id @default(cuid())
+  type      StockMovementType
+  quantity  Float // sempre positivo — o sinal vem do type
+  unitCost  Float? // custo unitário na entrada, pra acompanhar variação de preço
+  notes     String?
+  createdAt DateTime          @default(now())
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  salonId String
+  salon   Salon  @relation(fields: [salonId], references: [id], onDelete: Cascade)
+
+  @@index([salonId, createdAt])
+  @@index([productId])
 }

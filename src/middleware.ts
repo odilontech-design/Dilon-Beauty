@@ -8,6 +8,8 @@ export const config = {
     "/agenda/:path*",
     "/clientes/:path*",
     "/financeiro/:path*",
+    "/comissoes/:path*",
+    "/estoque/:path*",
     "/configuracoes/:path*",
   ],
 };

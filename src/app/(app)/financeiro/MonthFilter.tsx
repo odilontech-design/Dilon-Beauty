@@ -11,14 +11,16 @@ import { formatCompetencia, shiftCompetencia } from "@/lib/finance/competencia";
 export function MonthFilter({
   current,
   available,
+  basePath = "/financeiro",
 }: {
   current: string;
   available: string[];
+  basePath?: string;
 }) {
   const router = useRouter();
 
   function irPara(competencia: string) {
-    router.push(`/financeiro?comp=${competencia}`);
+    router.push(`${basePath}?comp=${competencia}`);
   }
 
   // O seletor lista os meses que têm lançamento, mas as setas andam livremente:

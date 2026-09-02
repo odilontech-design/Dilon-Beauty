@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireTenant } from "@/lib/tenant";
 import { hasConflict } from "@/lib/scheduling";
+import { calcularComissao } from "@/lib/comissoes";
 import { revalidatePath } from "next/cache";
 
 export async function createAppointment(formData: FormData) {
@@ -45,16 +46,38 @@ export async function createAppointment(formData: FormData) {
 export async function updateAppointmentStatus(appointmentId: string, status: string) {
   const tenant = await requireTenant();
 
+  // Ao concluir, congela a comissão com o percentual vigente hoje — igual ao
+  // preço. Se o salão mudar o percentual mês que vem, o que já foi atendido
+  // continua valendo o combinado da época.
+  let commissionAmount: number | undefined;
+  if (status === "CONCLUIDO") {
+    const appt = await prisma.appointment.findFirst({
+      where: { id: appointmentId, salonId: tenant.salonId },
+      include: { professional: true, service: true },
+    });
+    if (appt) {
+      commissionAmount = calcularComissao(
+        appt.price,
+        appt.professional.commissionPct,
+        appt.service.commissionPct
+      );
+    }
+  }
+
   // O `updateMany` com salonId no where é o que impede um usuário de
   // atualizar um agendamento de outro salão mesmo sabendo o id dele.
   await prisma.appointment.updateMany({
     where: { id: appointmentId, salonId: tenant.salonId },
-    data: { status: status as any },
+    data: {
+      status: status as any,
+      ...(commissionAmount !== undefined ? { commissionAmount } : {}),
+    },
   });
 
   revalidatePath("/agenda");
   revalidatePath("/dashboard");
   revalidatePath("/financeiro");
+  revalidatePath("/comissoes");
 }
 
 export type RescheduleState = { ok: boolean; error?: string };
